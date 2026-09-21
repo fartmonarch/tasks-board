@@ -1,19 +1,132 @@
-kanban-page{
-
+.kanban-page {
+  /* 页面主体：限制内容宽度，并用 auto 水平居中。 */
+  max-width: 1200px;
+  /* 至少占满一屏高度，任务较少时页面也不会显得局促。 */
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 48px 24px;
+  /* color 会作为多数后代文字的默认颜色。 */
+  color: #1f2933;
+  background: #f6f8fa;
 }
 
-board-header{
-
+.kanban-header {
+  /* Flex 让标题区和按钮处于同一行。 */
+  display: flex;
+  /* 让按钮与标题区的底部对齐，而不是顶部对齐。 */
+  align-items: flex-end;
+  /* 将两个直接子元素推向左右两端。 */
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 32px;
 }
 
-board{
-
+.eyebrow {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 14px;
 }
 
-board-column{
-
+.kanban-header h1 {
+  margin: 0 0 12px;
+  font-size: 36px;
 }
 
-task-card{
-    
+.project-intro {
+  /* 避免项目说明一行过长，提升阅读性。 */
+  max-width: 640px;
+  margin: 0;
+  color: #475569;
+  /* 行高使用倍数，会随字体大小自动缩放。 */
+  line-height: 1.7;
+}
+
+.kanban-header button {
+  /* 窗口变窄时，按钮不会被 Flex 布局压缩变形。 */
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  background: #1677ff;
+  /* 鼠标移入时显示可点击的指针。 */
+  cursor: pointer;
+}
+
+.kanban-board {
+  /* Grid 适合二维的看板布局：这里负责创建三列。 */
+  display: grid;
+  /* repeat 表示重复三列；1fr 表示三列平分可用空间。
+     minmax(0, 1fr) 允许列在窄屏时收缩，避免内容撑破容器。 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* gap 是列与列之间的间距，不需要分别设置 margin。 */
+  gap: 20px;
+}
+
+.kanban-column {
+  /* 每个状态列都是一个独立的任务容器。 */
+  min-height: 300px;
+  padding: 16px;
+  border: 1px solid #d9e0e7;
+  border-radius: 8px;
+  background: #eef2f6;
+}
+
+.kanban-column h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+.task-card {
+  /* 任务卡用白色背景与列背景区分，形成层级。 */
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #d9e0e7;
+  border-radius: 6px;
+  background: #fff;
+  /* 轻微阴影用于表现卡片浮在列容器上方。 */
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+}
+
+.task-card__title {
+  margin: 0 0 16px;
+  color: #1f2933;
+  font-size: 16px;
+}
+
+.task-card__info {
+  display: grid;
+  gap: 8px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.task-card__info p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.task-card__label {
+  min-width: 48px;
+  color: #64748b;
+}
+
+@media (max-width: 768px) {
+  /* 媒体查询：当视口小于此宽度时，覆盖上方的桌面端规则。 */
+  .kanban-page {
+    padding: 32px 16px;
+  }
+
+  .kanban-header {
+    /* 手机上的标题和按钮改为上下排列，避免横向拥挤。 */
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .kanban-board {
+    /* 将桌面端三列改为单列，用户向下滚动查看各状态。 */
+    grid-template-columns: 1fr;
+  }
 }
