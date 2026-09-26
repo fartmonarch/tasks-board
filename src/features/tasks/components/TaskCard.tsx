@@ -1,9 +1,10 @@
 import type { Task } from "../types";
 type TaskCardProps = {
   task: Task;
+  onComplete: (taskId: number) => void;
 };
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, onComplete }: TaskCardProps) {
   return (
     <article className="task-card">
       <h3 className="task-card__title">{task.title}</h3>
@@ -16,6 +17,12 @@ export function TaskCard({ task }: TaskCardProps) {
           <span className="task-card__label">负责人</span>
           <span>{task.assignee}</span>
         </p>
+        <button
+          style={{ visibility: task.status !== "done" ? "visible" : "hidden" }}
+          onClick={() => onComplete(task.id)}
+        >
+          完成
+        </button>
       </div>
     </article>
   );

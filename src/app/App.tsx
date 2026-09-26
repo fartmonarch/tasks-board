@@ -1,45 +1,56 @@
 import "./App.css";
+import { useState } from "react";
 import type { Task } from "../features/tasks/types";
 import { TaskCard } from "../features/tasks/components/TaskCard";
 
 function App() {
-  const tasks: Task[] = [
+  const [tasks, setTasks] = useState<Task[]>([
     {
-      id: "1",
+      id: 1,
       title: "梳理看板需求",
       status: "todo",
       priority: "high",
       assignee: "张三",
     },
     {
-      id: "2",
+      id: 2,
       title: "完成静态页面",
       status: "doing",
       priority: "medium",
       assignee: "李四",
     },
     {
-      id: "3",
+      id: 3,
       title: "初始化 Git 仓库",
       status: "done",
       priority: "low",
       assignee: "王五",
     },
     {
-      id: "4",
+      id: 4,
       title: "编写 README",
       status: "todo",
       priority: "medium",
       assignee: "赵六",
     },
     {
-      id: "5",
+      id: 5,
       title: "设计数据库结构",
       status: "doing",
       priority: "high",
       assignee: "孙七",
     },
-  ];
+  ]);
+
+  function handleCompleteTask(taskId: number) {
+    setTasks((currentTasks) =>
+      // 在这里返回一个新数组
+      currentTasks.map((task) =>
+        task.id === taskId ? { ...task, status: "done" } : task,
+      ),
+    );
+  }
+
   const todoTasks = tasks.filter((task) => task.status === "todo");
   const doingTasks = tasks.filter((task) => task.status === "doing");
   const doneTasks = tasks.filter((task) => task.status === "done");
@@ -62,19 +73,31 @@ function App() {
         <section className="kanban-column">
           <h2>待办</h2>
           {todoTasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onComplete={handleCompleteTask}
+            />
           ))}
         </section>
         <section className="kanban-column">
           <h2>进行中</h2>
           {doingTasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onComplete={handleCompleteTask}
+            />
           ))}
         </section>
         <section className="kanban-column">
           <h2>已完成</h2>
           {doneTasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onComplete={handleCompleteTask}
+            />
           ))}
         </section>
       </section>
