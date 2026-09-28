@@ -3,10 +3,12 @@ import { useState } from "react";
 import type { Task } from "../features/tasks/types";
 import { TaskCard } from "../features/tasks/components/TaskCard";
 import { Button, Input, Select } from "antd";
+import { Routes, Route } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 
 type TaskStatusFilter = "all" | Task["status"];
 
-function App() {
+function BoardPage() {
   const [tasks, setTasks] = useState<Task[]>([
     {
       id: 1,
@@ -47,6 +49,7 @@ function App() {
 
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("all");
+  let projectId = useParams().projectId;
 
   function handleCompleteTask(taskId: number) {
     setTasks((currentTasks) =>
@@ -77,6 +80,7 @@ function App() {
         <div>
           <p className="eyebrow">React Kanban</p>
           <h1>任务协作看板</h1>
+          <p>当前项目ID:{projectId}</p>
           <p className="project-intro">
             面向小团队的任务协作 Web
             应用，用看板集中管理项目任务，并展示待处理、进行中和已完成三种工作状态。
@@ -168,6 +172,40 @@ function App() {
         </section>
       </section>
     </main>
+  );
+}
+
+function ProjectsPage() {
+  return (
+    <main>
+      <h1>项目列表</h1>
+      <p>这里是项目列表页面</p>
+      <Link to="/projects/p1/board">打开p1看板</Link>
+      <br />
+      <Link to="/settings">打开设置</Link>
+      <br />
+      <a href="/projects/p1/board">打开p1看板(a标签)</a>
+    </main>
+  );
+}
+function SettingsPage() {
+  return (
+    <main>
+      <h1>设置</h1>
+      <p>设置功能暂未开放</p>
+    </main>
+  );
+}
+function App() {
+  return (
+    <Routes>
+      <Route path="/projects" element={<ProjectsPage />} />
+      <Route path="/projects/:projectId/board" element={<BoardPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
+
+      {/* 可选：访问根路径时送到项目列表 */}
+      <Route path="/" element={<Navigate to="/projects" replace />} />
+    </Routes>
   );
 }
 
