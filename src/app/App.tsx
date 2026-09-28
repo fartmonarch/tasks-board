@@ -1,7 +1,13 @@
 import "./App.css";
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Task } from "../features/tasks/types";
 import { TaskCard } from "../features/tasks/components/TaskCard";
+import {
+  getTasks,
+  updateTaskStatus,
+  createTask,
+} from "../features/tasks/api/taskApi";
 import { Button, Input, Select } from "antd";
 import { Routes, Route } from "react-router-dom";
 import { Link, Navigate, useParams } from "react-router-dom";
@@ -9,55 +15,56 @@ import { Link, Navigate, useParams } from "react-router-dom";
 type TaskStatusFilter = "all" | Task["status"];
 
 function BoardPage() {
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: 1,
-      title: "梳理看板需求",
-      status: "todo",
-      priority: "high",
-      assignee: "张三",
-    },
-    {
-      id: 2,
-      title: "完成静态页面",
-      status: "doing",
-      priority: "medium",
-      assignee: "李四",
-    },
-    {
-      id: 3,
-      title: "初始化 Git 仓库",
-      status: "done",
-      priority: "low",
-      assignee: "王五",
-    },
-    {
-      id: 4,
-      title: "编写 README",
-      status: "todo",
-      priority: "medium",
-      assignee: "赵六",
-    },
-    {
-      id: 5,
-      title: "设计数据库结构",
-      status: "doing",
-      priority: "high",
-      assignee: "孙七",
-    },
-  ]);
+  // 使用 useQuery 获取任务列表
+  const {
+    data: tasks,
+    isPending,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: getTasks,
+  });
 
+  // 搜索关键字和状态筛选
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("all");
+  // 创建任务的标题
+  const [newTaskTitle, setNewTaskTitle] = useState<string>("");
+  // 从URL获取当前项目ID
   let projectId = useParams().projectId;
 
+  // 获取 queryClient 实例
+  const queryClient = useQueryClient();
+  // 创建一个 mutation 用于更新任务状态
+  const updateTaskMutation = useMutation({
+    mutationFn: (taskId: number) => updateTaskStatus(taskId, "done"),
+    onSuccess: () => {
+      // 让 ["tasks"] 对应的缓存失效 这样才会重新请求最新的任务列表
+      return queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+
   function handleCompleteTask(taskId: number) {
-    setTasks((currentTasks) =>
-      // 在这里返回一个新数组
-      currentTasks.map((task) =>
-        task.id === taskId ? { ...task, status: "done" } : task,
-      ),
-    );
+    updateTaskMutation.mutate(taskId);
+  }
+
+  // 创建一个 mutation 用于创建新任务
+  const createTaskMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: () => {
+      // 让 ["tasks"] 对应的缓存失效 这样才会重新请求最新的任务列表
+      setNewTaskTitle("");
+      return queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+
+  if (isPending) {
+    return <main>正在加载任务……</main>;
+  }
+
+  if (isError) {
+    return <main>加载失败：{error.message}</main>;
   }
 
   const visibleTasks = tasks.filter((task) => {
@@ -86,8 +93,21 @@ function BoardPage() {
             应用，用看板集中管理项目任务，并展示待处理、进行中和已完成三种工作状态。
           </p>
         </div>
-        <Button className="kanban-create-button" type="primary">
-          新建任务
+        <input
+          type="text"
+          value={newTaskTitle}
+          onChange={(e) => setNewTaskTitle(e.target.value)}
+          placeholder="输入新任务标题"
+        />
+        <Button
+          className="kanban-create-button"
+          type="primary"
+          onClick={() => {
+            createTaskMutation.mutate(newTaskTitle.trim());
+          }}
+          disabled={createTaskMutation.isPending || newTaskTitle.trim() == ""}
+        >
+          {createTaskMutation.isPending ? "创建中..." : "创建任务"}
         </Button>
       </header>
 
@@ -132,6 +152,11 @@ function BoardPage() {
               key={task.id}
               task={task}
               onComplete={handleCompleteTask}
+              isThisTaskPending={
+                updateTaskMutation.isPending &&
+                updateTaskMutation.variables === task.id
+              }
+              isMutationPending={updateTaskMutation.isPending}
             />
           ))}
           {todoTasks.length === 0 && (
@@ -148,6 +173,11 @@ function BoardPage() {
               key={task.id}
               task={task}
               onComplete={handleCompleteTask}
+              isThisTaskPending={
+                updateTaskMutation.isPending &&
+                updateTaskMutation.variables === task.id
+              }
+              isMutationPending={updateTaskMutation.isPending}
             />
           ))}
           {doingTasks.length === 0 && (
@@ -164,6 +194,11 @@ function BoardPage() {
               key={task.id}
               task={task}
               onComplete={handleCompleteTask}
+              isThisTaskPending={
+                updateTaskMutation.isPending &&
+                updateTaskMutation.variables === task.id
+              }
+              isMutationPending={updateTaskMutation.isPending}
             />
           ))}
           {doneTasks.length === 0 && (

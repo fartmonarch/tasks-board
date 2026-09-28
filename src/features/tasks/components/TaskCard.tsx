@@ -2,14 +2,23 @@ import type { Task } from "../types";
 type TaskCardProps = {
   task: Task;
   onComplete: (taskId: number) => void;
+  isThisTaskPending: boolean;
+  isMutationPending: boolean;
 };
 
-export function TaskCard({ task, onComplete }: TaskCardProps) {
+export function TaskCard({
+  task,
+  onComplete,
+  isThisTaskPending,
+  isMutationPending,
+}: TaskCardProps) {
   const priorityLabels = {
     low: "低",
     medium: "中",
     high: "高",
   };
+  const isDone = task.status === "done";
+  const canShow = !isDone;
 
   return (
     <article className="task-card">
@@ -29,19 +38,22 @@ export function TaskCard({ task, onComplete }: TaskCardProps) {
         </p>
         <p>
           <span className="task-card__label">状态</span>
-          <span>{
-            task.status === "todo"
+          <span>
+            {task.status === "todo"
               ? "待处理"
               : task.status === "doing"
                 ? "进行中"
-                : "已完成"
-          }</span>
+                : "已完成"}
+          </span>
         </p>
         <button
-          style={{ visibility: task.status !== "done" ? "visible" : "hidden" }}
+          style={{
+            visibility: canShow ? "visible" : "hidden",
+          }}
+          disabled={isMutationPending}
           onClick={() => onComplete(task.id)}
         >
-          完成
+          {isThisTaskPending ? "处理中..." : "完成"}
         </button>
       </div>
     </article>
