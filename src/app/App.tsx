@@ -1,18 +1,17 @@
 import "./App.css";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Task } from "../features/tasks/types";
 import { TaskCard } from "../features/tasks/components/TaskCard";
 import {
   getTasks,
   updateTaskStatus,
   createTask,
 } from "../features/tasks/api/taskApi";
-import { Button, Input, Select } from "antd";
+import { Button } from "antd";
 import { Routes, Route } from "react-router-dom";
 import { Link, Navigate, useParams } from "react-router-dom";
-
-type TaskStatusFilter = "all" | Task["status"];
+import { useTaskUiStore } from "../features/tasks/store/taskUiStore";
+import { TaskToolbar } from "../features/tasks/components/TaskToolbar";
 
 function BoardPage() {
   // 使用 useQuery 获取任务列表
@@ -27,14 +26,18 @@ function BoardPage() {
   });
 
   // 搜索关键字和状态筛选
-  const [search, setSearch] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("all");
+  // const [search, setSearch] = useState<string>("");
+  // const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("all");
+
+  // 使用 zustand 管理搜索关键字和状态筛选
+  const search = useTaskUiStore((state) => state.search);
+  const statusFilter = useTaskUiStore((state) => state.statusFilter);
   // 创建任务的标题
   const [newTaskTitle, setNewTaskTitle] = useState<string>("");
   // 从URL获取当前项目ID
   let projectId = useParams().projectId;
 
-  // 获取 queryClient 实例
+  // 获取 queryClient 实例, 用于在 mutation 成功后让缓存失效
   const queryClient = useQueryClient();
   // 创建一个 mutation 用于更新任务状态
   const updateTaskMutation = useMutation({
@@ -111,35 +114,7 @@ function BoardPage() {
         </Button>
       </header>
 
-      <section className="kanban-toolbar" aria-label="任务筛选">
-        <div className="kanban-toolbar__controls">
-          <Input
-            className="task-search"
-            type="search"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-            }}
-            placeholder="搜索任务标题"
-            aria-label="搜索任务标题"
-          />
-          <Select<TaskStatusFilter>
-            className="status-filter"
-            aria-label="按任务状态筛选"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={[
-              { label: "全部状态", value: "all" },
-              { label: "待处理", value: "todo" },
-              { label: "进行中", value: "doing" },
-              { label: "已完成", value: "done" },
-            ]}
-          />
-        </div>
-        <p className="kanban-result-count">
-          显示 <strong>{visibleTasks.length}</strong> 条任务
-        </p>
-      </section>
+      <TaskToolbar visibleTasksLength={visibleTasks.length} />
 
       <section className="kanban-board">
         <section className="kanban-column kanban-column--todo">
