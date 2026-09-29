@@ -3,7 +3,7 @@ export type Task = {
   title: string;
   status: "todo" | "doing" | "done";
   priority: "low" | "medium" | "high"; //优先级
-  assignee: string; //负责人
+  assignee: string;
 };
 
 export type TaskComment = {

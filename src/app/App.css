@@ -324,31 +324,48 @@ input {
   color: #57734f;
 }
 
-.task-card__info button {
+.task-card__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-card__status .ant-select {
+  min-width: 108px;
+}
+
+.task-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.task-card__actions .ant-btn {
   justify-self: start;
-  padding: 5px 10px;
-  margin-top: 5px;
-  border: 1px solid #d7e2d6;
-  border-radius: 5px;
-  background: #f2f7f0;
-  color: #41644d;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 650;
-  transition:
-    background-color 150ms ease,
-    border-color 150ms ease;
 }
 
-.task-card__info button:hover:not(:disabled) {
-  border-color: #9fb8a2;
-  background: #e8f1e6;
+.board-alert { margin: -10px 0 22px; }
+
+.board-welcome {
+  display: grid;
+  min-height: 260px;
+  place-content: center;
+  justify-items: center;
+  padding: 30px;
+  border: 1px dashed #cfd8cb;
+  border-radius: 12px;
+  background: rgb(255 254 250 / 72%);
+  text-align: center;
 }
 
-.task-card__info button:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
+.board-welcome__mark { color: #67816a; font-size: 26px; }
+.board-welcome h2 { margin: 12px 0 4px; color: #304136; font-size: 19px; }
+.board-welcome p { margin: 0; color: #788278; font-size: 13px; }
+.page-state, .simple-page { width: min(100% - 40px, 720px); margin: 80px auto; }
+.simple-page h1 { color: #2d3d33; }
+.task-edit-form { display: grid; gap: 16px; }
+.task-edit-form label { display: grid; gap: 6px; color: #626f65; font-size: 12px; }
 
 .task-detail-panel {
   display: grid;
