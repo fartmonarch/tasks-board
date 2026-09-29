@@ -2,12 +2,13 @@ import "./App.css";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { TaskCard } from "../features/tasks/components/TaskCard";
+import { TaskDetailPanel } from "../features/tasks/components/TaskDetailPanel";
 import {
   getTasks,
   updateTaskStatus,
   createTask,
 } from "../features/tasks/api/taskApi";
-import { Button } from "antd";
+import { Button, Input } from "antd";
 import { Routes, Route } from "react-router-dom";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useTaskUiStore } from "../features/tasks/store/taskUiStore";
@@ -32,6 +33,7 @@ function BoardPage() {
   // 使用 zustand 管理搜索关键字和状态筛选
   const search = useTaskUiStore((state) => state.search);
   const statusFilter = useTaskUiStore((state) => state.statusFilter);
+  const openTask = useTaskUiStore((state) => state.openTask);
   // 创建任务的标题
   const [newTaskTitle, setNewTaskTitle] = useState<string>("");
   // 从URL获取当前项目ID
@@ -96,22 +98,37 @@ function BoardPage() {
             应用，用看板集中管理项目任务，并展示待处理、进行中和已完成三种工作状态。
           </p>
         </div>
-        <input
-          type="text"
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-          placeholder="输入新任务标题"
-        />
-        <Button
-          className="kanban-create-button"
-          type="primary"
-          onClick={() => {
-            createTaskMutation.mutate(newTaskTitle.trim());
+        <form
+          className="task-create-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const title = newTaskTitle.trim();
+            if (!title || createTaskMutation.isPending) return;
+            createTaskMutation.mutate(title);
           }}
-          disabled={createTaskMutation.isPending || newTaskTitle.trim() == ""}
         >
-          {createTaskMutation.isPending ? "创建中..." : "创建任务"}
-        </Button>
+          <label className="task-create-label" htmlFor="new-task-title">
+            新建任务
+          </label>
+          <div className="task-create-controls">
+            <Input
+              id="new-task-title"
+              className="task-create-input"
+              value={newTaskTitle}
+              onChange={(event) => setNewTaskTitle(event.target.value)}
+              placeholder="例如：整理本周迭代计划"
+              aria-label="新任务标题"
+            />
+            <Button
+              className="kanban-create-button"
+              type="primary"
+              htmlType="submit"
+              disabled={createTaskMutation.isPending || !newTaskTitle.trim()}
+            >
+              {createTaskMutation.isPending ? "创建中..." : "创建任务"}
+            </Button>
+          </div>
+        </form>
       </header>
 
       <TaskToolbar visibleTasksLength={visibleTasks.length} />
@@ -127,6 +144,7 @@ function BoardPage() {
               key={task.id}
               task={task}
               onComplete={handleCompleteTask}
+              onOpenDetails={openTask}
               isThisTaskPending={
                 updateTaskMutation.isPending &&
                 updateTaskMutation.variables === task.id
@@ -148,6 +166,7 @@ function BoardPage() {
               key={task.id}
               task={task}
               onComplete={handleCompleteTask}
+              onOpenDetails={openTask}
               isThisTaskPending={
                 updateTaskMutation.isPending &&
                 updateTaskMutation.variables === task.id
@@ -169,6 +188,7 @@ function BoardPage() {
               key={task.id}
               task={task}
               onComplete={handleCompleteTask}
+              onOpenDetails={openTask}
               isThisTaskPending={
                 updateTaskMutation.isPending &&
                 updateTaskMutation.variables === task.id
@@ -181,6 +201,7 @@ function BoardPage() {
           )}
         </section>
       </section>
+      <TaskDetailPanel />
     </main>
   );
 }

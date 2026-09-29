@@ -2,6 +2,7 @@ import type { Task } from "../types";
 type TaskCardProps = {
   task: Task;
   onComplete: (taskId: number) => void;
+  onOpenDetails: (taskId: number) => void;
   isThisTaskPending: boolean;
   isMutationPending: boolean;
 };
@@ -9,6 +10,7 @@ type TaskCardProps = {
 export function TaskCard({
   task,
   onComplete,
+  onOpenDetails,
   isThisTaskPending,
   isMutationPending,
 }: TaskCardProps) {
@@ -54,6 +56,9 @@ export function TaskCard({
           onClick={() => onComplete(task.id)}
         >
           {isThisTaskPending ? "处理中..." : "完成"}
+        </button>
+        <button type="button" onClick={() => onOpenDetails(task.id)}>
+          查看详情
         </button>
       </div>
     </article>

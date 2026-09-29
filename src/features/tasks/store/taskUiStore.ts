@@ -6,13 +6,17 @@ export type TaskStatusFilter = "all" | Task["status"];
 type TaskUiState = {
   search: string;
   statusFilter: TaskStatusFilter;
+  selectedTaskId: number | null;
   setSearch: (value: string) => void;
   setStatusFilter: (value: TaskStatusFilter) => void;
+  openTask: (taskId: number) => void;
+  closeTask: () => void;
 };
 
 export const useTaskUiStore = create<TaskUiState>((set) => ({
   search: "",
   statusFilter: "all",
+  selectedTaskId: null,
   setSearch: (value) => {
     // 在这里调用 set 更新 search
     set((state) => ({ ...state, search: value }));
@@ -21,4 +25,6 @@ export const useTaskUiStore = create<TaskUiState>((set) => ({
     // 在这里调用 set 更新 statusFilter
     set((state) => ({ ...state, statusFilter: value }));
   },
+  openTask: (taskId) => set({ selectedTaskId: taskId }),
+  closeTask: () => set({ selectedTaskId: null }),
 }));

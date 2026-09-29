@@ -1,4 +1,4 @@
-import type { Task } from "../types";
+import type { Task, TaskComment } from "../types";
 
 let tasks: Task[] = [
   {
@@ -35,6 +35,15 @@ let tasks: Task[] = [
     status: "doing",
     priority: "high",
     assignee: "孙七",
+  },
+];
+
+let comments: TaskComment[] = [
+  {
+    id: 1,
+    taskId: 1,
+    content: "先明确看板的核心操作和使用角色。",
+    createdAt: "2026-09-28T09:30:00.000Z",
   },
 ];
 
@@ -75,4 +84,40 @@ export async function createTask(title: string): Promise<Task> {
 export async function getTasks(): Promise<Task[]> {
   await new Promise((resolve) => setTimeout(resolve, 1000));
   return tasks;
+}
+
+export async function getTaskById(taskId: number): Promise<Task | undefined> {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  return tasks.find((task) => task.id === taskId);
+}
+
+export async function getTaskComments(taskId: number): Promise<TaskComment[]> {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  return comments.filter((comment) => comment.taskId === taskId);
+}
+
+export async function addTaskComment(
+  taskId: number,
+  content: string,
+): Promise<TaskComment> {
+  const normalizedContent = content.trim();
+  if (!normalizedContent) {
+    throw new Error("评论内容不能为空");
+  }
+
+  if (!tasks.some((task) => task.id === taskId)) {
+    throw new Error("任务不存在，无法添加评论");
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  const newComment: TaskComment = {
+    id: comments.length + 1,
+    taskId,
+    content: normalizedContent,
+    createdAt: new Date().toISOString(),
+  };
+
+  comments = [...comments, newComment];
+  return newComment;
 }
