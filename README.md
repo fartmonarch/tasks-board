@@ -2,6 +2,12 @@
 
 一个基于 React、TypeScript 和 Supabase 的轻量级项目任务协作看板。用户可以创建或加入项目，在看板中管理任务状态、优先级、负责人和评论。
 
+## 在线体验
+
+[打开任务协作看板](https://tasks-board-swart.vercel.app)
+
+前端部署在 Vercel，认证和业务数据由 Supabase 提供。新用户可以通过邮箱注册；如果需要邮箱验证，请先完成邮件验证再登录。登录用户可以创建项目、浏览项目名称并选择加入；任务和评论仅对项目成员开放。
+
 ## 功能
 
 - 邮箱注册、登录和退出登录
@@ -30,6 +36,19 @@
 - Node.js：建议使用当前维护中的 LTS 版本
 - npm：随 Node.js 一同安装
 - Supabase 项目：启用邮箱认证，并应用本仓库提供的数据库迁移
+
+## Vercel 部署
+
+项目使用 Vite 构建为静态前端，构建命令为 `npm run build`，输出目录为 `dist`。根目录的 `vercel.json` 已配置 SPA 路由回退，支持直接打开或刷新看板地址。
+
+在 Vercel 项目的 Environment Variables 中配置以下变量；修改变量后需要重新部署：
+
+```dotenv
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<your-supabase-publishable-key>
+```
+
+在 Supabase 的 Authentication → URL Configuration 中，将 Site URL 设置为正式站点地址，并把需要使用的生产或预览地址加入 Redirect URLs。前端只使用 Publishable/anon key；不要将 `service_role` 密钥放进前端环境变量。
 
 ## 本地运行
 
@@ -73,7 +92,7 @@ npm run dev       # 启动本地开发服务器
 npm run build     # TypeScript 检查并构建生产版本
 npm run preview   # 本地预览生产构建
 npm run lint      # 运行 ESLint
-npm test          # 运行 Vitest 测试
+npm run test      # 运行 Vitest 测试
 ```
 
 ## 页面路由
@@ -121,4 +140,4 @@ TanStack Query 管理服务端项目、任务、详情和评论数据；Zustand 
 
 ## 当前范围
 
-项目聚焦于项目和任务协作的核心流程。团队层级管理、邀请审批、通知、附件和实时协作等能力是否支持，请以路线图和待完善功能文档为准。
+项目聚焦于项目和任务协作的核心流程。邀请审批、通知、附件和实时推送暂不属于当前范围；后续计划请以路线图和待完善功能文档为准。
