@@ -7,7 +7,7 @@ import { TaskCard } from "../features/tasks/components/TaskCard";
 import { TaskDetailPanel } from "../features/tasks/components/TaskDetailPanel";
 import { TaskToolbar } from "../features/tasks/components/TaskToolbar";
 import { createTask, deleteTask, getTasks, updateTask } from "../features/tasks/api/taskApi";
-import { createProject, createTeam, getProjectMembers, getWorkspace } from "../features/projects/api/projectApi";
+import { createProject, createTeam, getProjectById, getProjectMembers, getWorkspace } from "../features/projects/api/projectApi";
 import { useAuthSession } from "../features/auth/AuthGate";
 import { supabase } from "../lib/supabase";
 import { useTaskUiStore } from "../features/tasks/store/taskUiStore";
@@ -18,6 +18,7 @@ function BoardPage() {
   const { projectId } = useParams();
   const session = useAuthSession();
   const userId = session?.user.id;
+  const projectQuery = useQuery({ queryKey: ["project", userId, projectId], queryFn: () => getProjectById(projectId!), enabled: Boolean(supabase && userId && projectId) });
   const { data: tasks = [], isPending, isError, error } = useQuery({ queryKey: ["tasks", userId, projectId], queryFn: () => getTasks(projectId!), enabled: Boolean(supabase && userId && projectId) });
   const membersQuery = useQuery({ queryKey: ["projectMembers", userId, projectId], queryFn: () => getProjectMembers(projectId!), enabled: Boolean(supabase && userId && projectId) });
   const queryClient = useQueryClient();
@@ -34,6 +35,8 @@ function BoardPage() {
 
   if (!supabase) return <main className="simple-page"><h1>演示看板</h1><Alert type="info" showIcon message="演示模式暂不连接数据库" description="登录 Supabase 后即可在项目看板中保存真实任务。" /></main>;
   if (!projectId) return <Navigate to="/projects" replace />;
+  if (projectQuery.isPending) return <main className="page-state">正在加载项目……</main>;
+  if (projectQuery.isError) return <main className="page-state"><Alert type="error" showIcon message="项目加载失败" description={projectQuery.error.message} action={<Button onClick={() => void projectQuery.refetch()}>重试</Button>} /></main>;
 
   if (isPending) return <main className="page-state">正在加载任务……</main>;
   if (isError) return <main className="page-state"><Alert type="error" showIcon message="任务加载失败" description={error.message} action={<Button onClick={() => void refreshTasks()}>重试</Button>} /></main>;
@@ -48,7 +51,7 @@ function BoardPage() {
 
   return <main className="kanban-page">
     <header className="kanban-header">
-      <div><p className="eyebrow">TEAM WORKSPACE / PROJECT {projectId}</p><h1>任务协作看板</h1><p className="project-intro">把团队的下一步放在一起，清晰推进每一项工作。</p></div>
+      <div><p className="eyebrow">TEAM WORKSPACE / PROJECT {projectQuery.data.name}</p><h1>任务协作看板</h1><p className="project-intro">把团队的下一步放在一起，清晰推进每一项工作。</p></div>
       <form className="task-create-form" onSubmit={(event) => { event.preventDefault(); const title = newTaskTitle.trim(); if (title && !createMutation.isPending) createMutation.mutate(title); }}>
         <label className="task-create-label" htmlFor="new-task-title">新建任务</label><div className="task-create-controls"><Input id="new-task-title" className="task-create-input" value={newTaskTitle} maxLength={120} onChange={(event) => setNewTaskTitle(event.target.value)} placeholder="例如：整理本周迭代计划" aria-label="新任务标题" />
           <Button className="kanban-create-button" type="primary" htmlType="submit" loading={createMutation.isPending} disabled={!newTaskTitle.trim()}>创建任务</Button></div>

@@ -1,4 +1,5 @@
 import { supabase } from "../../../lib/supabase";
+import { ensureCurrentProfile } from "../../auth/profileApi";
 
 export type TeamSummary = {
   id: string;
@@ -46,63 +47,36 @@ export async function getWorkspace() {
   return { teams, projects: (projectsResult.data ?? []) as ProjectSummary[] };
 }
 
-export async function createTeam(name: string) {
-  const client = requireSupabase();
-  const { data: { user }, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  if (!user) throw new Error("登录状态已失效，请重新登录。");
-
-  const { data, error } = await client
-    .from("teams")
-    .insert({ name: name.trim(), created_by: user.id })
-    .select("id, name")
+export async function getProjectById(projectId: string): Promise<ProjectSummary> {
+  const { data, error } = await requireSupabase()
+    .from("projects")
+    .select("id, team_id, name")
+    .eq("id", projectId)
     .single();
   if (error) throw error;
-  const { error: membershipError } = await client
-    .from("team_members")
-    .insert({ team_id: data.id, user_id: user.id, role: "admin" });
-  if (membershipError) throw new Error(`团队已创建，但管理员成员关系没有保存：${membershipError.message}`);
+  return data as ProjectSummary;
+}
+
+export async function createTeam(name: string) {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("create_team", { team_name: name.trim() }).single();
+  if (error) throw error;
   return data;
 }
 
 export async function createProject(teamId: string, name: string) {
   const client = requireSupabase();
-  const { data: { user }, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  if (!user) throw new Error("登录状态已失效，请重新登录。");
-
-  const { data: membership, error: membershipQueryError } = await client
-    .from("team_members")
-    .select("user_id")
-    .eq("team_id", teamId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (membershipQueryError) throw membershipQueryError;
-  if (!membership) {
-    const { error } = await client
-      .from("team_members")
-      .insert({ team_id: teamId, user_id: user.id, role: "admin" });
-    if (error) throw error;
-  }
-
-  const { data: project, error: projectError } = await client
-    .from("projects")
-    .insert({ team_id: teamId, name: name.trim(), created_by: user.id })
-    .select("id, team_id, name")
+  const { data, error } = await client
+    .rpc("create_project", { target_team_id: teamId, project_name: name.trim() })
     .single();
-  if (projectError) throw projectError;
-
-  const { error: projectMembershipError } = await client
-    .from("project_members")
-    .insert({ team_id: teamId, project_id: project.id, user_id: user.id });
-  if (projectMembershipError) {
-    throw new Error(`项目已创建，但成员关系没有保存：${projectMembershipError.message}`);
-  }
-  return project as ProjectSummary;
+  if (error) throw error;
+  return data as ProjectSummary;
 }
 
 export async function getProjectMembers(projectId: string): Promise<ProjectMember[]> {
   const client = requireSupabase();
+  await ensureCurrentProfile();
+
   const { data: projectMembers, error } = await client
     .from("project_members")
     .select("user_id")
@@ -117,5 +91,5 @@ export async function getProjectMembers(projectId: string): Promise<ProjectMembe
     .in("id", userIds);
   if (profilesError) throw profilesError;
   const names = new Map((profiles ?? []).map((profile) => [profile.id, profile.display_name]));
-  return userIds.map((userId) => ({ userId, name: names.get(userId) || userId.slice(0, 8) }));
+  return userIds.map((userId) => ({ userId, name: names.get(userId) || "未设置姓名" }));
 }

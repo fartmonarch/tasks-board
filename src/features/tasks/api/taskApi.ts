@@ -1,4 +1,5 @@
 import { supabase } from "../../../lib/supabase";
+import { ensureCurrentProfile } from "../../auth/profileApi";
 import type { Task, TaskComment } from "../types";
 
 type TaskRow = {
@@ -22,12 +23,13 @@ async function requireUserId() {
 }
 
 async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
+  await ensureCurrentProfile();
   const assigneeIds = [...new Set(rows.flatMap((row) => row.assignee_user_id ? [row.assignee_user_id] : []))];
   const profiles = new Map<string, string>();
   if (assigneeIds.length > 0) {
     const { data, error } = await requireSupabase().from("profiles").select("id, display_name").in("id", assigneeIds);
     if (error) throw error;
-    for (const profile of data ?? []) profiles.set(profile.id, profile.display_name || profile.id.slice(0, 8));
+    for (const profile of data ?? []) profiles.set(profile.id, profile.display_name || "未设置姓名");
   }
   return rows.map((row) => ({
     id: row.id,
@@ -35,7 +37,7 @@ async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
     status: row.status,
     priority: row.priority,
     assigneeUserId: row.assignee_user_id,
-    assignee: row.assignee_user_id ? profiles.get(row.assignee_user_id) ?? row.assignee_user_id.slice(0, 8) : "未分配",
+    assignee: row.assignee_user_id ? profiles.get(row.assignee_user_id) ?? "未设置姓名" : "未分配",
   }));
 }
 

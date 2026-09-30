@@ -64,10 +64,6 @@ export function TaskDetailPanel({ projectId, userId }: { projectId: string; user
           {taskQuery.data && (
             <section className="task-detail-summary" aria-label="任务信息">
               <p>
-                <span>任务 ID</span>
-                <strong>{taskQuery.data.id}</strong>
-              </p>
-              <p>
                 <span>状态</span>
                 <strong>
                   {taskQuery.data.status === "todo"
