@@ -1,75 +1,124 @@
-# React + TypeScript + Vite
+# React Kanban
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个基于 React、TypeScript 和 Supabase 的轻量级项目任务协作看板。用户可以创建或加入项目，在看板中管理任务状态、优先级、负责人和评论。
 
-Currently, two official plugins are available:
+## 功能
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 邮箱注册、登录和退出登录
+- 创建项目、查看已加入项目，并浏览和加入其他项目
+- 按待处理、进行中、已完成三个状态组织任务
+- 创建、编辑、删除任务，调整状态和优先级
+- 将项目成员设为任务负责人
+- 按任务标题搜索，并按状态筛选
+- 查看任务详情和评论、发表评论
+- 设置个人显示名称
+- 基于 Supabase Auth、Postgres 和 Row Level Security 控制访问
+- 未配置 Supabase 时，可在开发环境查看演示入口；演示模式不保存任务数据
 
-## React Compiler
+## 技术栈
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| 分类 | 技术 |
+| --- | --- |
+| 前端 | React 19、TypeScript 6、Vite 8 |
+| 路由与组件 | React Router 7、Ant Design 6、Ant Design Icons 6 |
+| 状态与数据请求 | Zustand 5、TanStack Query 5 |
+| 后端服务 | Supabase Auth、Postgres、Supabase JavaScript Client |
+| 质量工具 | ESLint 10、Vitest 5、Testing Library |
 
-## Expanding the ESLint configuration
+## 环境要求
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Node.js：建议使用当前维护中的 LTS 版本
+- npm：随 Node.js 一同安装
+- Supabase 项目：启用邮箱认证，并应用本仓库提供的数据库迁移
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 本地运行
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+git clone <repository-url>
+cd react-kanban
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+在项目根目录新建 `.env.local`，填入 Supabase 项目的连接信息：
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```dotenv
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<your-supabase-publishable-key>
 ```
+
+这两个变量会被前端构建工具注入到浏览器端。只能使用 Supabase publishable/anon key；不要将 `service_role` 密钥或其他服务端密钥放入 `VITE_` 变量。
+
+在 Supabase 项目中应用 `supabase/migrations/` 下的迁移。可以使用 Supabase CLI 将本地项目关联到 Supabase 项目后执行：
+
+```bash
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npx supabase db push
+```
+
+也可以按文件名顺序在 Supabase SQL Editor 中执行迁移文件。部署前请确认迁移已全部应用，尤其是项目成员访问策略和 `create_project` 函数。
+
+启动开发服务器：
+
+```bash
+npm run dev
+```
+
+Vite 会在终端显示本地访问地址。未配置 Supabase 时，开发环境显示演示入口；已配置时，用户需要注册或登录后访问项目功能。生产环境缺少 Supabase 配置时会显示配置错误提示。
+
+## 常用命令
+
+```bash
+npm run dev       # 启动本地开发服务器
+npm run build     # TypeScript 检查并构建生产版本
+npm run preview   # 本地预览生产构建
+npm run lint      # 运行 ESLint
+npm test          # 运行 Vitest 测试
+```
+
+## 页面路由
+
+| 路径 | 说明 |
+| --- | --- |
+| `/projects` | 项目列表、加入项目和创建项目 |
+| `/projects/:projectId/board` | 指定项目的任务协作看板 |
+| `/settings` | 个人显示名称设置 |
+
+根路径 `/` 会重定向到 `/projects`。部署到静态托管服务时，需要将未知前端路由回退到 `index.html`，以支持直接访问和刷新上述路径。
+
+## 项目结构
+
+```text
+src/
+├── app/                  # 应用页面、路由页面和全局样式
+├── features/
+│   ├── auth/             # 登录、会话和个人资料
+│   ├── projects/         # 项目数据访问
+│   └── tasks/            # 任务组件、数据访问、UI 状态和筛选
+├── lib/                  # Supabase 客户端
+└── test/                 # 测试初始化
+supabase/
+└── migrations/           # 数据库结构、访问策略和 RPC 迁移
+docs/                     # 权限说明、路线图和开发记录
+```
+
+TanStack Query 管理服务端项目、任务、详情和评论数据；Zustand 保存看板搜索、状态筛选及当前选中的任务 ID；表单中的临时输入由组件本地状态管理。
+
+## 数据与权限说明
+
+- 项目、项目成员、任务、评论和个人资料保存在 Supabase 数据库中。
+- 数据访问依赖 Supabase Auth 会话和数据库 Row Level Security 策略。请勿为了让界面可用而关闭 RLS。
+- 当前用户只能访问其已加入项目中的任务及相关评论；可加入项目列表仅展示项目名称。
+- 新建项目通过数据库 RPC 创建，并由迁移配置项目创建者和成员关系。
+- 负责人关联 Supabase 用户账号，界面显示名称来自个人资料。
+
+## 相关文档
+
+- [用户权限与数据访问](docs/用户权限与数据访问.md)
+- [项目完整路线图](docs/项目完整路线图.md)
+- [待完善功能与开发顺序](docs/待完善功能与开发顺序.md)
+- [阶段进度速查](docs/阶段进度速查.md)
+
+## 当前范围
+
+项目聚焦于项目和任务协作的核心流程。团队层级管理、邀请审批、通知、附件和实时协作等能力是否支持，请以路线图和待完善功能文档为准。
