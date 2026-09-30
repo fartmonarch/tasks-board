@@ -3,11 +3,11 @@ import type { Task } from "../types";
 
 type TaskCardProps = {
   task: Task;
-  onComplete: (taskId: number) => void;
-  onStatusChange: (taskId: number, status: Task["status"]) => void;
+  onComplete: (taskId: string) => void;
+  onStatusChange: (taskId: string, status: Task["status"]) => void;
   onEdit: (task: Task) => void;
-  onDelete: (taskId: number) => void;
-  onOpenDetails: (taskId: number) => void;
+  onDelete: (taskId: string) => void;
+  onOpenDetails: (taskId: string) => void;
   isThisTaskPending: boolean;
 };
 

@@ -6,10 +6,10 @@ export type TaskStatusFilter = "all" | Task["status"];
 type TaskUiState = {
   search: string;
   statusFilter: TaskStatusFilter;
-  selectedTaskId: number | null;
+  selectedTaskId: string | null;
   setSearch: (value: string) => void;
   setStatusFilter: (value: TaskStatusFilter) => void;
-  openTask: (taskId: number) => void;
+  openTask: (taskId: string) => void;
   closeTask: () => void;
 };
 

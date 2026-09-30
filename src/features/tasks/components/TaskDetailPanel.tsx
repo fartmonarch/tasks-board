@@ -5,22 +5,22 @@ import { addTaskComment, getTaskById, getTaskComments } from "../api/taskApi";
 import { useTaskUiStore } from "../store/taskUiStore";
 
 type AddCommentVariables = {
-  taskId: number;
+  taskId: string;
   content: string;
 };
 
-export function TaskDetailPanel() {
+export function TaskDetailPanel({ projectId, userId }: { projectId: string; userId: string }) {
   const [commentContent, setCommentContent] = useState("");
   const selectedTaskId = useTaskUiStore((state) => state.selectedTaskId);
   const closeTask = useTaskUiStore((state) => state.closeTask);
   const queryClient = useQueryClient();
 
   const taskQuery = useQuery({
-    queryKey: ["tasks", "detail", selectedTaskId],
+    queryKey: ["tasks", "detail", userId, projectId, selectedTaskId],
     queryFn: async () => {
       if (selectedTaskId === null) return null;
 
-      const task = await getTaskById(selectedTaskId);
+      const task = await getTaskById(projectId, selectedTaskId);
       if (!task) throw new Error("任务不存在");
       return task;
     },
@@ -28,7 +28,7 @@ export function TaskDetailPanel() {
   });
 
   const commentsQuery = useQuery({
-    queryKey: ["tasks", "comments", selectedTaskId],
+    queryKey: ["tasks", "comments", userId, projectId, selectedTaskId],
     queryFn: () =>
       selectedTaskId === null
         ? Promise.resolve([])
@@ -42,7 +42,7 @@ export function TaskDetailPanel() {
     onSuccess: (_comment, variables) => {
       setCommentContent("");
       return queryClient.invalidateQueries({
-        queryKey: ["tasks", "comments", variables.taskId],
+        queryKey: ["tasks", "comments", userId, projectId, variables.taskId],
       });
     },
   });

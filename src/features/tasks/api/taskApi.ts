@@ -1,54 +1,122 @@
+import { supabase } from "../../../lib/supabase";
 import type { Task, TaskComment } from "../types";
 
-let tasks: Task[] = [
-  { id: 1, title: "梳理看板需求", status: "todo", priority: "high", assignee: "张三" },
-  { id: 2, title: "完成静态页面", status: "doing", priority: "medium", assignee: "李四" },
-  { id: 3, title: "初始化 Git 仓库", status: "done", priority: "low", assignee: "王五" },
-  { id: 4, title: "编写 README", status: "todo", priority: "medium", assignee: "赵六" },
-  { id: 5, title: "设计数据库结构", status: "doing", priority: "high", assignee: "孙七" },
-];
-let comments: TaskComment[] = [{ id: 1, taskId: 1, content: "先明确看板的核心操作和使用角色。", createdAt: "2026-09-28T09:30:00.000Z" }];
+type TaskRow = {
+  id: string;
+  title: string;
+  status: Task["status"];
+  priority: Task["priority"];
+  assignee_user_id: string | null;
+};
 
-export async function updateTask(taskId: number, changes: Partial<Pick<Task, "title" | "status" | "priority" | "assignee">>): Promise<Task> {
-  await new Promise((resolve) => setTimeout(resolve, 250));
-  const task = tasks.find((item) => item.id === taskId);
-  if (!task) throw new Error("任务不存在");
-  tasks = tasks.map((item) => item.id === taskId ? { ...item, ...changes } : item);
-  return tasks.find((item) => item.id === taskId)!;
+function requireSupabase() {
+  if (!supabase) throw new Error("请先配置 Supabase 环境变量并登录。");
+  return supabase;
 }
-export async function updateTaskStatus(taskId: number, status: Task["status"]): Promise<Task> {
-  return updateTask(taskId, { status });
+
+async function requireUserId() {
+  const { data: { user }, error } = await requireSupabase().auth.getUser();
+  if (error) throw error;
+  if (!user) throw new Error("登录状态已失效，请重新登录。");
+  return user.id;
 }
-export async function deleteTask(taskId: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  if (!tasks.some((task) => task.id === taskId)) throw new Error("任务不存在");
-  tasks = tasks.filter((task) => task.id !== taskId);
-  comments = comments.filter((comment) => comment.taskId !== taskId);
+
+async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
+  const assigneeIds = [...new Set(rows.flatMap((row) => row.assignee_user_id ? [row.assignee_user_id] : []))];
+  const profiles = new Map<string, string>();
+  if (assigneeIds.length > 0) {
+    const { data, error } = await requireSupabase().from("profiles").select("id, display_name").in("id", assigneeIds);
+    if (error) throw error;
+    for (const profile of data ?? []) profiles.set(profile.id, profile.display_name || profile.id.slice(0, 8));
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    priority: row.priority,
+    assigneeUserId: row.assignee_user_id,
+    assignee: row.assignee_user_id ? profiles.get(row.assignee_user_id) ?? row.assignee_user_id.slice(0, 8) : "未分配",
+  }));
 }
-export async function createTask(title: string): Promise<Task> {
-  await new Promise((resolve) => setTimeout(resolve, 250));
-  const newTask: Task = { id: Math.max(0, ...tasks.map((task) => task.id)) + 1, title: title.trim(), status: "todo", priority: "medium", assignee: "未分配" };
-  tasks = [...tasks, newTask];
-  return newTask;
+
+export async function getTasks(projectId: string): Promise<Task[]> {
+  const { data, error } = await requireSupabase()
+    .from("tasks")
+    .select("id, title, status, priority, assignee_user_id")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return mapTasks((data ?? []) as TaskRow[]);
 }
-export async function getTasks(): Promise<Task[]> {
-  await new Promise((resolve) => setTimeout(resolve, 350));
-  return [...tasks];
+
+export async function getTaskById(projectId: string, taskId: string): Promise<Task | undefined> {
+  const { data, error } = await requireSupabase()
+    .from("tasks")
+    .select("id, title, status, priority, assignee_user_id")
+    .eq("project_id", projectId)
+    .eq("id", taskId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return undefined;
+  return (await mapTasks([data as TaskRow]))[0];
 }
-export async function getTaskById(taskId: number): Promise<Task | undefined> {
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  return tasks.find((task) => task.id === taskId);
+
+export async function createTask(projectId: string, title: string): Promise<Task> {
+  const userId = await requireUserId();
+  const { data, error } = await requireSupabase()
+    .from("tasks")
+    .insert({ project_id: projectId, title: title.trim(), created_by: userId })
+    .select("id, title, status, priority, assignee_user_id")
+    .single();
+  if (error) throw error;
+  return (await mapTasks([data as TaskRow]))[0];
 }
-export async function getTaskComments(taskId: number): Promise<TaskComment[]> {
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  return comments.filter((comment) => comment.taskId === taskId);
+
+export async function updateTask(
+  projectId: string,
+  taskId: string,
+  changes: Partial<Pick<Task, "title" | "status" | "priority" | "assigneeUserId">>,
+): Promise<Task> {
+  const { data, error } = await requireSupabase()
+    .from("tasks")
+    .update({
+      ...(changes.title === undefined ? {} : { title: changes.title.trim() }),
+      ...(changes.status === undefined ? {} : { status: changes.status }),
+      ...(changes.priority === undefined ? {} : { priority: changes.priority }),
+      ...(changes.assigneeUserId === undefined ? {} : { assignee_user_id: changes.assigneeUserId }),
+    })
+    .eq("project_id", projectId)
+    .eq("id", taskId)
+    .select("id, title, status, priority, assignee_user_id")
+    .single();
+  if (error) throw error;
+  return (await mapTasks([data as TaskRow]))[0];
 }
-export async function addTaskComment(taskId: number, content: string): Promise<TaskComment> {
+
+export async function deleteTask(projectId: string, taskId: string): Promise<void> {
+  const { error } = await requireSupabase().from("tasks").delete().eq("project_id", projectId).eq("id", taskId);
+  if (error) throw error;
+}
+
+export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
+  const { data, error } = await requireSupabase()
+    .from("comments")
+    .select("id, task_id, content, created_at")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((comment) => ({ id: comment.id, taskId: comment.task_id, content: comment.content, createdAt: comment.created_at }));
+}
+
+export async function addTaskComment(taskId: string, content: string): Promise<TaskComment> {
+  const authorId = await requireUserId();
   const normalizedContent = content.trim();
   if (!normalizedContent) throw new Error("评论内容不能为空");
-  if (!tasks.some((task) => task.id === taskId)) throw new Error("任务不存在，无法添加评论");
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  const newComment: TaskComment = { id: Math.max(0, ...comments.map((comment) => comment.id)) + 1, taskId, content: normalizedContent, createdAt: new Date().toISOString() };
-  comments = [...comments, newComment];
-  return newComment;
+  const { data, error } = await requireSupabase()
+    .from("comments")
+    .insert({ task_id: taskId, author_id: authorId, content: normalizedContent })
+    .select("id, task_id, content, created_at")
+    .single();
+  if (error) throw error;
+  return { id: data.id, taskId: data.task_id, content: data.content, createdAt: data.created_at };
 }

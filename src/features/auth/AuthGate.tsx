@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Alert, Button, Spin } from "antd";
 import type { Session } from "@supabase/supabase-js";
 import App from "../../app/App";
 import { isSupabaseConfigured, supabase } from "../../lib/supabase";
 import { AuthPage } from "./AuthPage";
+
+const AuthSessionContext = createContext<Session | null>(null);
+export function useAuthSession() { return useContext(AuthSessionContext); }
 
 export function AuthGate() {
   const [session, setSession] = useState<Session | null>(null);
@@ -28,8 +31,8 @@ export function AuthGate() {
   if (loading) return <main className="auth-loading"><Spin size="large" tip="正在恢复登录状态…" /></main>;
   if (!session) return <AuthPage />;
 
-  return <div className="authenticated-app">
+  return <AuthSessionContext.Provider value={session}><div className="authenticated-app">
     <header className="account-bar"><span>已登录 <strong>{session.user.email}</strong></span><Button size="small" onClick={() => void supabase?.auth.signOut()}>退出登录</Button></header>
     <App />
-  </div>;
+  </div></AuthSessionContext.Provider>;
 }

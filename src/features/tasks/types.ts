@@ -1,14 +1,15 @@
 export type Task = {
-  id: number;
+  id: string;
   title: string;
   status: "todo" | "doing" | "done";
   priority: "low" | "medium" | "high"; //优先级
   assignee: string;
+  assigneeUserId: string | null;
 };
 
 export type TaskComment = {
-  id: number;
-  taskId: number;
+  id: string;
+  taskId: string;
   content: string;
   createdAt: string;
 };
