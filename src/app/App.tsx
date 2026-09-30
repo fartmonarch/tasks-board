@@ -1,5 +1,5 @@
 import "./App.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Input, Modal, Select } from "antd";
 import { Link, Navigate, Route, Routes, useParams } from "react-router-dom";
@@ -9,6 +9,7 @@ import { TaskToolbar } from "../features/tasks/components/TaskToolbar";
 import { createTask, deleteTask, getTasks, updateTask } from "../features/tasks/api/taskApi";
 import { createProject, createTeam, getProjectById, getProjectMembers, getWorkspace } from "../features/projects/api/projectApi";
 import { useAuthSession } from "../features/auth/AuthGate";
+import { getCurrentProfile, updateCurrentProfile } from "../features/auth/profileApi";
 import { supabase } from "../lib/supabase";
 import { useTaskUiStore } from "../features/tasks/store/taskUiStore";
 import { filterTasks } from "../features/tasks/utils/filterTasks";
@@ -93,7 +94,7 @@ function ProjectsPage() {
   const operationError = createTeamMutation.error?.message ?? createProjectMutation.error?.message;
 
   return <main className="simple-page">
-    <p className="eyebrow">TEAM WORKSPACE</p><h1>项目</h1>
+    <p className="eyebrow">TEAM WORKSPACE</p><h1>项目</h1><Link to="/settings">设置我的显示名称 →</Link>
     {workspaceQuery.isPending && <p>正在加载项目……</p>}
     {workspaceQuery.isError && <Alert type="error" showIcon message="项目加载失败" description={workspaceQuery.error.message} action={<Button onClick={() => void workspaceQuery.refetch()}>重试</Button>} />}
     {operationError && <Alert className="project-alert" type="error" showIcon closable message="操作未完成" description={operationError} />}
@@ -114,6 +115,39 @@ function ProjectsPage() {
     </>}
   </main>;
 }
-function SettingsPage() { return <main className="simple-page"><p className="eyebrow">PREFERENCES</p><h1>设置</h1><p>设置功能将在后续阶段开放。</p><Link to="/projects">返回项目</Link></main>; }
+function SettingsPage() {
+  const session = useAuthSession();
+  const userId = session?.user.id;
+  const queryClient = useQueryClient();
+  const [displayName, setDisplayName] = useState("");
+  const profileQuery = useQuery({ queryKey: ["profile", userId], queryFn: getCurrentProfile, enabled: Boolean(supabase && userId) });
+  const saveMutation = useMutation({
+    mutationFn: updateCurrentProfile,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profile", userId] }),
+        queryClient.invalidateQueries({ queryKey: ["projectMembers"] }),
+        queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+      ]);
+    },
+  });
+  useEffect(() => { if (profileQuery.data) setDisplayName(profileQuery.data.displayName); }, [profileQuery.data?.displayName]);
+
+  if (!supabase) return <main className="simple-page"><h1>设置</h1><Alert type="info" showIcon message="演示模式下不能保存资料" /></main>;
+  return <main className="simple-page">
+    <p className="eyebrow">PREFERENCES</p><h1>个人资料</h1>
+    <p>负责人姓名保存在个人资料中，任务只关联负责人账号。</p>
+    {profileQuery.isPending && <p>正在加载资料……</p>}
+    {profileQuery.isError && <Alert type="error" showIcon message="资料加载失败" description={profileQuery.error.message} />}
+    {saveMutation.isError && <Alert className="project-alert" type="error" showIcon message="保存失败" description={saveMutation.error.message} />}
+    <form className="project-form" onSubmit={(event) => { event.preventDefault(); if (displayName.trim()) saveMutation.mutate(displayName); }}>
+      <label htmlFor="profile-display-name">显示名称</label>
+      <Input id="profile-display-name" value={displayName} maxLength={100} onChange={(event) => setDisplayName(event.target.value)} placeholder="输入负责人显示名称" />
+      <Button type="primary" htmlType="submit" loading={saveMutation.isPending} disabled={!displayName.trim()}>保存名称</Button>
+    </form>
+    {saveMutation.isSuccess && <Alert type="success" showIcon message="名称已保存" />}
+    <Link to="/projects">返回项目</Link>
+  </main>;
+}
 function App() { return <Routes><Route path="/projects" element={<ProjectsPage />} /><Route path="/projects/:projectId/board" element={<BoardPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/" element={<Navigate to="/projects" replace />} /></Routes>; }
 export default App;

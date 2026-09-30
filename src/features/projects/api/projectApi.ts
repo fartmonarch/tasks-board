@@ -69,6 +69,9 @@ export async function createProject(teamId: string, name: string) {
   const { data, error } = await client
     .rpc("create_project", { target_team_id: teamId, project_name: name.trim() })
     .single();
+  if (error?.code === "23505") {
+    throw new Error("该团队下已存在同名项目，请换一个名称。项目名不区分大小写。");
+  }
   if (error) throw error;
   return data as ProjectSummary;
 }
