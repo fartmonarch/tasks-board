@@ -368,6 +368,9 @@ input {
 .project-list h2, .project-form h2 { margin: 0 0 4px; color: #304136; font-size: 16px; }
 .project-list__item { display: flex; justify-content: space-between; padding: 14px 16px; border: 1px solid #e1e7e1; border-radius: 10px; color: #304136; text-decoration: none; }
 .project-list__item:hover { border-color: #9bad9d; background: #f8faf7; }
+.project-join-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px solid #e1e7e1; border-radius: 10px; }
+.project-join-item > div { display: grid; gap: 4px; }
+.project-join-item strong { color: #304136; font-size: 14px; }
 .project-form { max-width: 460px; }
 .project-form label { color: #626f65; font-size: 13px; }
 .project-form .ant-btn { justify-self: start; margin-top: 6px; }

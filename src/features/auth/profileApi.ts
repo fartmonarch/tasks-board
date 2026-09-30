@@ -18,7 +18,7 @@ export async function ensureCurrentProfile() {
     const metadataName = [metadata.display_name, metadata.full_name, metadata.name]
       .find((value): value is string => typeof value === "string" && value.trim().length > 0)
       ?.trim();
-    const displayName = metadataName || user.email?.split("@")[0] || "团队成员";
+    const displayName = metadataName || user.email?.split("@")[0] || "项目成员";
     if (!profile) {
       const { error } = await supabase.from("profiles").insert({ id: user.id, display_name: displayName });
       if (error && error.code !== "23505") throw error;

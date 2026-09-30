@@ -3,20 +3,20 @@ import { filterTasks } from "./filterTasks";
 import type { Task } from "../types";
 
 const tasks: Task[] = [
-  { id: 1, title: "Prepare release notes", status: "todo", priority: "high", assignee: "A" },
-  { id: 2, title: "Review API design", status: "doing", priority: "medium", assignee: "B" },
-  { id: 3, title: "Release checklist", status: "done", priority: "low", assignee: "C" },
+  { id: "task-1", title: "Prepare release notes", status: "todo", priority: "high", assignee: "A", assigneeUserId: null },
+  { id: "task-2", title: "Review API design", status: "doing", priority: "medium", assignee: "B", assigneeUserId: null },
+  { id: "task-3", title: "Release checklist", status: "done", priority: "low", assignee: "C", assigneeUserId: null },
 ];
 
 describe("filterTasks", () => {
   it("matches a trimmed keyword without case sensitivity", () => {
-    expect(filterTasks(tasks, "  RELEASE ", "all").map((task) => task.id)).toEqual([1, 3]);
+    expect(filterTasks(tasks, "  RELEASE ", "all").map((task) => task.id)).toEqual(["task-1", "task-3"]);
   });
   it("filters by status", () => {
-    expect(filterTasks(tasks, "", "doing").map((task) => task.id)).toEqual([2]);
+    expect(filterTasks(tasks, "", "doing").map((task) => task.id)).toEqual(["task-2"]);
   });
   it("combines keyword and status", () => {
-    expect(filterTasks(tasks, "release", "done").map((task) => task.id)).toEqual([3]);
+    expect(filterTasks(tasks, "release", "done").map((task) => task.id)).toEqual(["task-3"]);
   });
   it("returns all tasks when both filters are empty", () => {
     expect(filterTasks(tasks, "   ", "all")).toEqual(tasks);

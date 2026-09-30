@@ -1,5 +1,5 @@
 import "./App.css";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Input, Modal, Select } from "antd";
 import { Link, Navigate, Route, Routes, useParams } from "react-router-dom";
@@ -7,8 +7,8 @@ import { TaskCard } from "../features/tasks/components/TaskCard";
 import { TaskDetailPanel } from "../features/tasks/components/TaskDetailPanel";
 import { TaskToolbar } from "../features/tasks/components/TaskToolbar";
 import { createTask, deleteTask, getTasks, updateTask } from "../features/tasks/api/taskApi";
-import { createProject, createTeam, getProjectById, getProjectMembers, getWorkspace } from "../features/projects/api/projectApi";
-import { useAuthSession } from "../features/auth/AuthGate";
+import { createProject, getJoinableProjects, getProjectById, getProjectMembers, getWorkspace, joinProject } from "../features/projects/api/projectApi";
+import { useAuthSession } from "../features/auth/AuthSessionContext";
 import { getCurrentProfile, updateCurrentProfile } from "../features/auth/profileApi";
 import { supabase } from "../lib/supabase";
 import { useTaskUiStore } from "../features/tasks/store/taskUiStore";
@@ -52,7 +52,7 @@ function BoardPage() {
 
   return <main className="kanban-page">
     <header className="kanban-header">
-      <div><p className="eyebrow">TEAM WORKSPACE / PROJECT {projectQuery.data.name}</p><h1>任务协作看板</h1><p className="project-intro">把团队的下一步放在一起，清晰推进每一项工作。</p></div>
+      <div><p className="eyebrow">PROJECT TASKS / {projectQuery.data.name}</p><h1>任务协作看板</h1><p className="project-intro">把项目的下一步放在一起，清晰推进每一项工作。</p></div>
       <form className="task-create-form" onSubmit={(event) => { event.preventDefault(); const title = newTaskTitle.trim(); if (title && !createMutation.isPending) createMutation.mutate(title); }}>
         <label className="task-create-label" htmlFor="new-task-title">新建任务</label><div className="task-create-controls"><Input id="new-task-title" className="task-create-input" value={newTaskTitle} maxLength={120} onChange={(event) => setNewTaskTitle(event.target.value)} placeholder="例如：整理本周迭代计划" aria-label="新任务标题" />
           <Button className="kanban-create-button" type="primary" htmlType="submit" loading={createMutation.isPending} disabled={!newTaskTitle.trim()}>创建任务</Button></div>
@@ -60,7 +60,7 @@ function BoardPage() {
     </header>
     {actionError && <Alert className="board-alert" type="error" showIcon closable message="操作未完成" description={actionError} onClose={() => setActionError("")} />}
     <TaskToolbar visibleTasksLength={visibleTasks.length} />
-    {tasks.length === 0 ? <section className="board-welcome"><span className="board-welcome__mark">✳</span><h2>从一条任务开始</h2><p>创建第一条任务，团队就可以开始安排工作了。</p></section> : visibleTasks.length === 0 ? <section className="board-welcome"><h2>没有匹配的任务</h2><p>试试其他关键词或筛选条件。</p></section> : <section className="kanban-board" aria-label="任务看板">
+    {tasks.length === 0 ? <section className="board-welcome"><span className="board-welcome__mark">✳</span><h2>从一条任务开始</h2><p>创建第一条任务，项目成员就可以开始安排工作了。</p></section> : visibleTasks.length === 0 ? <section className="board-welcome"><h2>没有匹配的任务</h2><p>试试其他关键词或筛选条件。</p></section> : <section className="kanban-board" aria-label="任务看板">
       {columns.map((column) => <section className={`kanban-column kanban-column--${column.status}`} key={column.status} aria-label={column.title}>
         <div className="kanban-column__header"><h2>{column.title}</h2><span>{column.tasks.length}</span></div>
         {column.tasks.map((task) => <TaskCard key={task.id} task={task} onComplete={(id) => updateMutation.mutate({ id, changes: { status: "done" } })} onStatusChange={(id, status) => updateMutation.mutate({ id, changes: { status } })} onEdit={setEditingTask} onDelete={(id) => deleteMutation.mutate(id)} onOpenDetails={openTask} isThisTaskPending={isPendingTask(task.id)} />)}
@@ -78,23 +78,27 @@ function ProjectsPage() {
   const session = useAuthSession();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
-  const [teamName, setTeamName] = useState("");
   const [projectName, setProjectName] = useState("");
-  const [selectedTeamId, setSelectedTeamId] = useState("");
   const workspaceQuery = useQuery({ queryKey: ["workspace", "projects", userId], queryFn: getWorkspace, enabled: Boolean(supabase && userId) });
+  const joinableProjectsQuery = useQuery({ queryKey: ["workspace", "joinableProjects", userId], queryFn: getJoinableProjects, enabled: Boolean(supabase && userId) });
   const refreshWorkspace = () => queryClient.invalidateQueries({ queryKey: ["workspace", "projects", userId] });
-  const createTeamMutation = useMutation({ mutationFn: createTeam, onSuccess: async () => { setTeamName(""); await refreshWorkspace(); } });
-  const createProjectMutation = useMutation({ mutationFn: ({ teamId, name }: { teamId: string; name: string }) => createProject(teamId, name), onSuccess: async () => { setProjectName(""); await refreshWorkspace(); }, onSettled: refreshWorkspace });
+  const createProjectMutation = useMutation({ mutationFn: createProject, onSuccess: async () => { setProjectName(""); await refreshWorkspace(); }, onSettled: refreshWorkspace });
+  const joinProjectMutation = useMutation({
+    mutationFn: joinProject,
+    onSuccess: async () => {
+      await Promise.all([
+        refreshWorkspace(),
+        queryClient.invalidateQueries({ queryKey: ["workspace", "joinableProjects", userId] }),
+      ]);
+    },
+  });
 
-  if (!supabase) return <main className="simple-page"><p className="eyebrow">TEAM WORKSPACE</p><h1>项目</h1><Alert type="info" showIcon message="配置 Supabase 后可创建真实项目" description="当前为本地演示模式。" /><Link to="/projects/p1/board">打开演示看板 →</Link></main>;
+  if (!supabase) return <main className="simple-page"><p className="eyebrow">PROJECT TASKS</p><h1>项目</h1><Alert type="info" showIcon message="配置 Supabase 后可创建真实项目" description="当前为本地演示模式。" /><Link to="/projects/p1/board">打开演示看板 →</Link></main>;
 
-  const teams = workspaceQuery.data?.teams ?? [];
-  const adminTeams = teams.filter((team) => team.role === "admin");
-  const projectTeamId = selectedTeamId || adminTeams[0]?.id || "";
-  const operationError = createTeamMutation.error?.message ?? createProjectMutation.error?.message;
+  const operationError = createProjectMutation.error?.message ?? joinProjectMutation.error?.message;
 
   return <main className="simple-page">
-    <p className="eyebrow">TEAM WORKSPACE</p><h1>项目</h1><Link to="/settings">设置我的显示名称 →</Link>
+    <p className="eyebrow">PROJECT TASKS</p><h1>项目</h1><Link to="/settings">设置我的显示名称 →</Link>
     {workspaceQuery.isPending && <p>正在加载项目……</p>}
     {workspaceQuery.isError && <Alert type="error" showIcon message="项目加载失败" description={workspaceQuery.error.message} action={<Button onClick={() => void workspaceQuery.refetch()}>重试</Button>} />}
     {operationError && <Alert className="project-alert" type="error" showIcon closable message="操作未完成" description={operationError} />}
@@ -103,15 +107,19 @@ function ProjectsPage() {
         <h2 id="project-list-title">我的项目</h2>
         {workspaceQuery.data.projects.length === 0 ? <p>还没有可访问的项目。</p> : workspaceQuery.data.projects.map((project) => <Link className="project-list__item" key={project.id} to={`/projects/${project.id}/board`}><span>{project.name}</span><span aria-hidden="true">→</span></Link>)}
       </section>
-      {teams.length === 0 && <form className="project-form" onSubmit={(event) => { event.preventDefault(); const name = teamName.trim(); if (name) createTeamMutation.mutate(name); }}>
-        <h2>创建团队</h2><label htmlFor="new-team-name">团队名称</label><Input id="new-team-name" value={teamName} maxLength={100} onChange={(event) => setTeamName(event.target.value)} placeholder="例如：产品研发组" />
-        <Button type="primary" htmlType="submit" loading={createTeamMutation.isPending} disabled={!teamName.trim()}>创建团队</Button>
-      </form>}
-      {adminTeams.length > 0 && <form className="project-form" onSubmit={(event) => { event.preventDefault(); if (projectTeamId && projectName.trim()) createProjectMutation.mutate({ teamId: projectTeamId, name: projectName.trim() }); }}>
-        <h2>新建项目</h2><label htmlFor="project-team">所属团队</label><Select id="project-team" value={projectTeamId} onChange={setSelectedTeamId} options={adminTeams.map((team) => ({ label: team.name, value: team.id }))} />
+      <section className="project-list" aria-labelledby="join-projects-title">
+        <h2 id="join-projects-title">可加入的项目</h2>
+        <p>已登录用户可以浏览项目名称并自行加入，加入后即可参与该项目协作。</p>
+        {joinableProjectsQuery.isPending ? <p>正在加载可加入项目……</p> : joinableProjectsQuery.isError ? <Alert type="error" showIcon message="可加入项目加载失败" description={joinableProjectsQuery.error.message} action={<Button onClick={() => void joinableProjectsQuery.refetch()}>重试</Button>} /> : joinableProjectsQuery.data.length === 0 ? <p>当前没有其他可加入的项目。</p> : joinableProjectsQuery.data.map((project) => <div className="project-join-item" key={project.id}>
+          <div><strong>{project.name}</strong></div>
+          <Button loading={joinProjectMutation.isPending && joinProjectMutation.variables === project.id} disabled={joinProjectMutation.isPending} onClick={() => joinProjectMutation.mutate(project.id)}>加入项目</Button>
+        </div>)}
+      </section>
+      <form className="project-form" onSubmit={(event) => { event.preventDefault(); if (projectName.trim()) createProjectMutation.mutate(projectName.trim()); }}>
+        <h2>新建项目</h2>
         <label htmlFor="new-project-name">项目名称</label><Input id="new-project-name" value={projectName} maxLength={120} onChange={(event) => setProjectName(event.target.value)} placeholder="例如：产品迭代" />
         <Button type="primary" htmlType="submit" loading={createProjectMutation.isPending} disabled={!projectName.trim()}>创建项目</Button>
-      </form>}
+      </form>
     </>}
   </main>;
 }
@@ -119,8 +127,9 @@ function SettingsPage() {
   const session = useAuthSession();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
-  const [displayName, setDisplayName] = useState("");
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const profileQuery = useQuery({ queryKey: ["profile", userId], queryFn: getCurrentProfile, enabled: Boolean(supabase && userId) });
+  const currentDisplayName = displayName ?? profileQuery.data?.displayName ?? "";
   const saveMutation = useMutation({
     mutationFn: updateCurrentProfile,
     onSuccess: async () => {
@@ -131,8 +140,6 @@ function SettingsPage() {
       ]);
     },
   });
-  useEffect(() => { if (profileQuery.data) setDisplayName(profileQuery.data.displayName); }, [profileQuery.data?.displayName]);
-
   if (!supabase) return <main className="simple-page"><h1>设置</h1><Alert type="info" showIcon message="演示模式下不能保存资料" /></main>;
   return <main className="simple-page">
     <p className="eyebrow">PREFERENCES</p><h1>个人资料</h1>
@@ -140,10 +147,10 @@ function SettingsPage() {
     {profileQuery.isPending && <p>正在加载资料……</p>}
     {profileQuery.isError && <Alert type="error" showIcon message="资料加载失败" description={profileQuery.error.message} />}
     {saveMutation.isError && <Alert className="project-alert" type="error" showIcon message="保存失败" description={saveMutation.error.message} />}
-    <form className="project-form" onSubmit={(event) => { event.preventDefault(); if (displayName.trim()) saveMutation.mutate(displayName); }}>
+    <form className="project-form" onSubmit={(event) => { event.preventDefault(); if (currentDisplayName.trim()) saveMutation.mutate(currentDisplayName); }}>
       <label htmlFor="profile-display-name">显示名称</label>
-      <Input id="profile-display-name" value={displayName} maxLength={100} onChange={(event) => setDisplayName(event.target.value)} placeholder="输入负责人显示名称" />
-      <Button type="primary" htmlType="submit" loading={saveMutation.isPending} disabled={!displayName.trim()}>保存名称</Button>
+      <Input id="profile-display-name" value={currentDisplayName} maxLength={100} onChange={(event) => setDisplayName(event.target.value)} placeholder="输入负责人显示名称" />
+      <Button type="primary" htmlType="submit" loading={saveMutation.isPending} disabled={!currentDisplayName.trim()}>保存名称</Button>
     </form>
     {saveMutation.isSuccess && <Alert type="success" showIcon message="名称已保存" />}
     <Link to="/projects">返回项目</Link>

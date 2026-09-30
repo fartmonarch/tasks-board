@@ -1,15 +1,13 @@
 import { supabase } from "../../../lib/supabase";
 import { ensureCurrentProfile } from "../../auth/profileApi";
 
-export type TeamSummary = {
-  id: string;
-  name: string;
-  role: "admin" | "member";
-};
-
 export type ProjectSummary = {
   id: string;
-  team_id: string;
+  name: string;
+};
+
+export type JoinableProject = {
+  id: string;
   name: string;
 };
 
@@ -29,48 +27,66 @@ export async function getWorkspace() {
   if (userError) throw userError;
   if (!user) throw new Error("登录状态已失效，请重新登录。");
 
-  const [teamsResult, membershipsResult, projectsResult] = await Promise.all([
-    client.from("teams").select("id, name, created_by").order("created_at"),
-    client.from("team_members").select("team_id, role").eq("user_id", user.id),
-    client.from("projects").select("id, team_id, name").order("created_at", { ascending: false }),
-  ]);
-  if (teamsResult.error) throw teamsResult.error;
+  const membershipsResult = await client
+    .from("project_members")
+    .select("project_id")
+    .eq("user_id", user.id);
   if (membershipsResult.error) throw membershipsResult.error;
-  if (projectsResult.error) throw projectsResult.error;
+  const projectIds = (membershipsResult.data ?? []).map((membership) => membership.project_id);
+  if (projectIds.length === 0) return { projects: [] as ProjectSummary[] };
 
-  const roles = new Map((membershipsResult.data ?? []).map((membership) => [membership.team_id, membership.role]));
-  const teams: TeamSummary[] = (teamsResult.data ?? []).map((team) => ({
-    id: team.id,
-    name: team.name,
-    role: team.created_by === user.id ? "admin" : (roles.get(team.id) as TeamSummary["role"] ?? "member"),
-  }));
-  return { teams, projects: (projectsResult.data ?? []) as ProjectSummary[] };
+  const projectsResult = await client
+    .from("projects")
+    .select("id, name")
+    .in("id", projectIds)
+    .order("name");
+  if (projectsResult.error) throw projectsResult.error;
+  return { projects: (projectsResult.data ?? []) as ProjectSummary[] };
+}
+
+export async function getJoinableProjects(): Promise<JoinableProject[]> {
+  const client = requireSupabase();
+  const { data: { user }, error: userError } = await client.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error("登录状态已失效，请重新登录。");
+
+  const [projectsResult, membershipsResult] = await Promise.all([
+    client.from("projects").select("id, name").order("name"),
+    client.from("project_members").select("project_id").eq("user_id", user.id),
+  ]);
+  if (projectsResult.error) throw projectsResult.error;
+  if (membershipsResult.error) throw membershipsResult.error;
+  const memberProjectIds = new Set((membershipsResult.data ?? []).map((membership) => membership.project_id));
+  return (projectsResult.data ?? []).filter((project) => !memberProjectIds.has(project.id));
+}
+
+export async function joinProject(projectId: string): Promise<void> {
+  const client = requireSupabase();
+  const { data: { user }, error: userError } = await client.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error("登录状态已失效，请重新登录。");
+
+  const { error } = await client.from("project_members").insert({ project_id: projectId, user_id: user.id });
+  if (error && error.code !== "23505") throw error;
 }
 
 export async function getProjectById(projectId: string): Promise<ProjectSummary> {
   const { data, error } = await requireSupabase()
     .from("projects")
-    .select("id, team_id, name")
+    .select("id, name")
     .eq("id", projectId)
     .single();
   if (error) throw error;
   return data as ProjectSummary;
 }
 
-export async function createTeam(name: string) {
-  const client = requireSupabase();
-  const { data, error } = await client.rpc("create_team", { team_name: name.trim() }).single();
-  if (error) throw error;
-  return data;
-}
-
-export async function createProject(teamId: string, name: string) {
+export async function createProject(name: string) {
   const client = requireSupabase();
   const { data, error } = await client
-    .rpc("create_project", { target_team_id: teamId, project_name: name.trim() })
+    .rpc("create_project", { project_name: name.trim() })
     .single();
   if (error?.code === "23505") {
-    throw new Error("该团队下已存在同名项目，请换一个名称。项目名不区分大小写。");
+    throw new Error("已存在同名项目，请换一个名称。项目名不区分大小写。");
   }
   if (error) throw error;
   return data as ProjectSummary;

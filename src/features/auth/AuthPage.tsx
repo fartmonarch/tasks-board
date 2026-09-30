@@ -35,7 +35,7 @@ export function AuthPage() {
   return <main className="auth-page">
     <div className="auth-brand"><span className="auth-brand__mark">K</span><span>一起推进项目</span></div>
     <Card className="auth-card" bordered={false}>
-      <p className="eyebrow">TEAM WORKSPACE</p>
+      <p className="eyebrow">PROJECT TASKS</p>
       <h1>{mode === "login" ? "欢迎回来" : "创建账号"}</h1>
       <p className="auth-description">登录后与你的伙伴一起管理项目任务。</p>
       <Segmented className="auth-mode" block value={mode} onChange={(value) => { setMode(value as "login" | "signup"); setError(""); setNotice(""); }} options={[{ label: "登录", value: "login" }, { label: "注册", value: "signup" }]} />
@@ -48,6 +48,6 @@ export function AuthPage() {
         <Button type="primary" htmlType="submit" block loading={pending}>{mode === "login" ? "登录" : "创建账号"}</Button>
       </Form>
     </Card>
-    <p className="auth-footnote">你的团队任务只对已授权成员开放。</p>
+    <p className="auth-footnote">项目任务仅对已加入该项目的成员开放。</p>
   </main>;
 }

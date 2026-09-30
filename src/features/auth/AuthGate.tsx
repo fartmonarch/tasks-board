@@ -1,12 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Button, Spin } from "antd";
 import type { Session } from "@supabase/supabase-js";
 import App from "../../app/App";
 import { isSupabaseConfigured, supabase } from "../../lib/supabase";
+import { AuthSessionContext } from "./AuthSessionContext";
 import { AuthPage } from "./AuthPage";
-
-const AuthSessionContext = createContext<Session | null>(null);
-export function useAuthSession() { return useContext(AuthSessionContext); }
 
 export function AuthGate() {
   const [session, setSession] = useState<Session | null>(null);
