@@ -14,12 +14,12 @@ import {
 } from "../features/tasks/api/taskApi";
 import {
   createProject,
-  getJoinableProjects,
   getProjectById,
   getProjectMembers,
   getWorkspace,
-  joinProject,
 } from "../features/projects/api/projectApi";
+import { ProjectInviteButton } from "../features/projects/components/ProjectInviteButton";
+import { ProjectInvitationPage } from "../features/projects/pages/ProjectInvitationPage";
 import { useAuthSession } from "../features/auth/AuthSessionContext";
 import {
   getCurrentProfile,
@@ -177,6 +177,7 @@ function BoardPage() {
           <p className="project-intro">
             把项目的下一步放在一起，清晰推进每一项工作。
           </p>
+          <ProjectInviteButton key={projectId} projectId={projectId} />
         </div>
         <form
           className="task-create-form"
@@ -353,11 +354,6 @@ function ProjectsPage() {
     queryFn: getWorkspace,
     enabled: Boolean(supabase && userId),
   });
-  const joinableProjectsQuery = useQuery({
-    queryKey: ["workspace", "joinableProjects", userId],
-    queryFn: getJoinableProjects,
-    enabled: Boolean(supabase && userId),
-  });
   const refreshWorkspace = () =>
     queryClient.invalidateQueries({
       queryKey: ["workspace", "projects", userId],
@@ -369,17 +365,6 @@ function ProjectsPage() {
       await refreshWorkspace();
     },
     onSettled: refreshWorkspace,
-  });
-  const joinProjectMutation = useMutation({
-    mutationFn: joinProject,
-    onSuccess: async () => {
-      await Promise.all([
-        refreshWorkspace(),
-        queryClient.invalidateQueries({
-          queryKey: ["workspace", "joinableProjects", userId],
-        }),
-      ]);
-    },
   });
 
   if (!supabase)
@@ -397,8 +382,7 @@ function ProjectsPage() {
       </main>
     );
 
-  const operationError =
-    createProjectMutation.error?.message ?? joinProjectMutation.error?.message;
+  const operationError = createProjectMutation.error?.message;
 
   return (
     <main className="simple-page">
@@ -435,7 +419,7 @@ function ProjectsPage() {
           >
             <h2 id="project-list-title">我的项目</h2>
             {workspaceQuery.data.projects.length === 0 ? (
-              <p>还没有可访问的项目。</p>
+              <p>还没有创建或加入的项目。可新建项目，或向项目组长获取邀请链接。</p>
             ) : (
               workspaceQuery.data.projects.map((project) => (
                 <Link
@@ -443,53 +427,11 @@ function ProjectsPage() {
                   key={project.id}
                   to={`/projects/${project.id}/board`}
                 >
-                  <span>{project.name}</span>
+                  <span>
+                    {project.name}{project.role === "owner" ? " (owner)" : ""}
+                  </span>
                   <span aria-hidden="true">→</span>
                 </Link>
-              ))
-            )}
-          </section>
-          <section
-            className="project-list"
-            aria-labelledby="join-projects-title"
-          >
-            <h2 id="join-projects-title">可加入的项目</h2>
-            <p>
-              已登录用户可以浏览项目名称并自行加入，加入后即可参与该项目协作。
-            </p>
-            {joinableProjectsQuery.isPending ? (
-              <p>正在加载可加入项目……</p>
-            ) : joinableProjectsQuery.isError ? (
-              <Alert
-                type="error"
-                showIcon
-                message="可加入项目加载失败"
-                description={joinableProjectsQuery.error.message}
-                action={
-                  <Button onClick={() => void joinableProjectsQuery.refetch()}>
-                    重试
-                  </Button>
-                }
-              />
-            ) : joinableProjectsQuery.data.length === 0 ? (
-              <p>当前没有其他可加入的项目。</p>
-            ) : (
-              joinableProjectsQuery.data.map((project) => (
-                <div className="project-join-item" key={project.id}>
-                  <div>
-                    <strong>{project.name}</strong>
-                  </div>
-                  <Button
-                    loading={
-                      joinProjectMutation.isPending &&
-                      joinProjectMutation.variables === project.id
-                    }
-                    disabled={joinProjectMutation.isPending}
-                    onClick={() => joinProjectMutation.mutate(project.id)}
-                  >
-                    加入项目
-                  </Button>
-                </div>
               ))
             )}
           </section>
@@ -611,6 +553,7 @@ function SettingsPage() {
 function App() {
   return (
     <Routes>
+      <Route path="/invite" element={<ProjectInvitationPage />} />
       <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/projects/:projectId/board" element={<BoardPage />} />
       <Route path="/settings" element={<SettingsPage />} />

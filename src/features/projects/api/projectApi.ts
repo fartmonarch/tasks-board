@@ -6,10 +6,7 @@ export type ProjectSummary = {
   name: string;
 };
 
-export type JoinableProject = {
-  id: string;
-  name: string;
-};
+export type MyProject = ProjectSummary & { role: "owner" | "member" };
 
 export type ProjectMember = {
   userId: string;
@@ -29,11 +26,11 @@ export async function getWorkspace() {
 
   const membershipsResult = await client
     .from("project_members")
-    .select("project_id")
+    .select("project_id, role")
     .eq("user_id", user.id);
   if (membershipsResult.error) throw membershipsResult.error;
   const projectIds = (membershipsResult.data ?? []).map((membership) => membership.project_id);
-  if (projectIds.length === 0) return { projects: [] as ProjectSummary[] };
+  if (projectIds.length === 0) return { projects: [] as MyProject[] };
 
   const projectsResult = await client
     .from("projects")
@@ -41,33 +38,10 @@ export async function getWorkspace() {
     .in("id", projectIds)
     .order("name");
   if (projectsResult.error) throw projectsResult.error;
-  return { projects: (projectsResult.data ?? []) as ProjectSummary[] };
-}
-
-export async function getJoinableProjects(): Promise<JoinableProject[]> {
-  const client = requireSupabase();
-  const { data: { user }, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  if (!user) throw new Error("登录状态已失效，请重新登录。");
-
-  const [projectsResult, membershipsResult] = await Promise.all([
-    client.from("projects").select("id, name").order("name"),
-    client.from("project_members").select("project_id").eq("user_id", user.id),
-  ]);
-  if (projectsResult.error) throw projectsResult.error;
-  if (membershipsResult.error) throw membershipsResult.error;
-  const memberProjectIds = new Set((membershipsResult.data ?? []).map((membership) => membership.project_id));
-  return (projectsResult.data ?? []).filter((project) => !memberProjectIds.has(project.id));
-}
-
-export async function joinProject(projectId: string): Promise<void> {
-  const client = requireSupabase();
-  const { data: { user }, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  if (!user) throw new Error("登录状态已失效，请重新登录。");
-
-  const { error } = await client.from("project_members").insert({ project_id: projectId, user_id: user.id });
-  if (error && error.code !== "23505") throw error;
+  const roles = new Map((membershipsResult.data ?? []).map((membership) => [membership.project_id, membership.role]));
+  return { projects: (projectsResult.data ?? []).map((project) => ({
+    ...project, role: roles.get(project.id) as MyProject["role"],
+  })) as MyProject[] };
 }
 
 export async function getProjectById(projectId: string): Promise<ProjectSummary> {

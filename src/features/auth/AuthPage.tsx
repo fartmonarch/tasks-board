@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { Alert, Button, Card, Form, Input, Segmented } from "antd";
+import { useLocation } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 
 type AuthValues = { email: string; password: string; displayName?: string };
 
 export function AuthPage() {
+  const location = useLocation();
+  const continuingInvite = location.pathname === "/invite";
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -37,7 +40,7 @@ export function AuthPage() {
     <Card className="auth-card" bordered={false}>
       <p className="eyebrow">PROJECT TASKS</p>
       <h1>{mode === "login" ? "欢迎回来" : "创建账号"}</h1>
-      <p className="auth-description">登录后与你的伙伴一起管理项目任务。</p>
+      <p className="auth-description">{continuingInvite ? "请先登录。登录后将继续当前邀请，确认账号后即可接受。" : "登录后与你的伙伴一起管理项目任务。"}</p>
       <Segmented className="auth-mode" block value={mode} onChange={(value) => { setMode(value as "login" | "signup"); setError(""); setNotice(""); }} options={[{ label: "登录", value: "login" }, { label: "注册", value: "signup" }]} />
       {error && <Alert className="auth-alert" type="error" showIcon message={error} />}
       {notice && <Alert className="auth-alert" type="success" showIcon message={notice} />}
