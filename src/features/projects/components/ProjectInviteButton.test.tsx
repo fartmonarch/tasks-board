@@ -40,26 +40,48 @@ describe("ProjectInviteButton", () => {
       screen.queryByRole("button", { name: /邀请成员/ }),
     ).not.toBeInTheDocument();
   });
-  it("allows an authorized user to generate once and copy the returned link", async () => {
-    const user = userEvent.setup();
-    const copy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
-    mocks.permission.mockResolvedValue(true);
-    const link = `https://example.test/invite#token=${"ef".repeat(32)}`;
-    mocks.create.mockResolvedValue({ link, expiresAt: "2026-10-05T00:00:00Z" });
+  it.each(["single", "group"])(
+    "allows an authorized user to generate and copy a %s link",
+    async (mode) => {
+      const user = userEvent.setup();
+      const copy = vi
+        .spyOn(navigator.clipboard, "writeText")
+        .mockResolvedValue();
+      mocks.permission.mockResolvedValue(true);
+      const link = `https://example.test/invite#token=${"ef".repeat(32)}`;
+      mocks.create.mockResolvedValue({
+        link,
+        expiresAt: "2026-10-05T00:00:00Z",
+      });
+      renderButton();
+      await user.click(await screen.findByRole("button", { name: /邀请成员/ }));
+      if (mode === "group") {
+        await user.click(
+          screen.getByRole("radio", { name: "1 小时 · 多人邀请" }),
+        );
+        expect(screen.getByText(/不限制人数/)).toBeInTheDocument();
+      }
+      await user.click(screen.getByRole("button", { name: /生成邀请链接/ }));
+      expect(await screen.findByLabelText("邀请链接")).toHaveValue(link);
+      expect(
+        screen.getByRole("button", { name: /生成邀请链接/ }),
+      ).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: /复制链接/ }));
+      expect(copy).toHaveBeenCalledWith(link);
+      expect(mocks.create).toHaveBeenCalledExactlyOnceWith("project-id", mode);
+      expect(await screen.findByRole("status")).toHaveTextContent(
+        "邀请链接已复制",
+      );
+    },
+  );
+  it("shows the unavailable-service explanation instead of only a generic permission failure", async () => {
+    mocks.permission.mockRejectedValue(
+      new Error("邀请功能暂不可用，请联系项目维护者启用后重试。"),
+    );
     renderButton();
-    await user.click(await screen.findByRole("button", { name: /邀请成员/ }));
-    await user.click(
-      screen.getByRole("button", { name: /生成一次性邀请链接/ }),
-    );
-    expect(await screen.findByLabelText("邀请链接")).toHaveValue(link);
     expect(
-      screen.getByRole("button", { name: /生成一次性邀请链接/ }),
-    ).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: /复制链接/ }));
-    expect(copy).toHaveBeenCalledWith(link);
-    expect(mocks.create).toHaveBeenCalledExactlyOnceWith("project-id");
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "邀请链接已复制",
-    );
+      await screen.findByText("邀请功能暂不可用，请联系项目维护者启用后重试。"),
+    ).toBeInTheDocument();
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 });

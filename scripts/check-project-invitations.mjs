@@ -682,7 +682,7 @@ try {
   async function race(rollbackFirst) {
     const targetProject = await createProject(
       ids.owner,
-      rollbackFirst ? "Rollback race" : "Concurrent race",
+      `${rollbackFirst ? "Rollback race" : "Concurrent race"} ${randomUUID()}`,
     );
     const link = await invite(ids.owner, targetProject);
     const first = await beginAs(ids.racer1);
@@ -827,6 +827,269 @@ try {
       connections.delete(second);
     },
   );
+  const modeMigration = migrations.find((name) =>
+    name.endsWith("_support_project_invitation_modes.sql"),
+  );
+  assert.ok(modeMigration, "Invitation mode migration is missing");
+  await check(
+    "mode migration preserves business data and existing single invitation states",
+    async () => {
+      const business = (await db.query(snapshotSql)).rows[0].snapshot;
+      const oldInvitations = (
+        await db.query(
+          "select to_jsonb(i) invitation from private.project_invitations i order by token_hash",
+        )
+      ).rows;
+      await db.query("begin");
+      await db.query(
+        await readFile(join(migrationsDir, modeMigration), "utf8"),
+      );
+      await db.query("commit");
+      assert.deepEqual(
+        (await db.query(snapshotSql)).rows[0].snapshot,
+        business,
+      );
+      assert.deepEqual(
+        (
+          await db.query(
+            "select to_jsonb(i)-'mode' invitation from private.project_invitations i order by token_hash",
+          )
+        ).rows,
+        oldInvitations,
+      );
+      assert.equal(
+        (
+          await db.query(
+            "select 1 from private.project_invitations where mode<>'single'",
+          )
+        ).rowCount,
+        0,
+      );
+    },
+  );
+  const inviteMode = (actor, projectId, mode) =>
+    asUser(
+      actor,
+      async (c) =>
+        (
+          await c.query(
+            "select * from public.create_project_invitation_with_mode($1,$2)",
+            [projectId, mode],
+          )
+        ).rows[0],
+    );
+  await check(
+    "new mode RPCs require authenticated owner/admin and keep private credentials inaccessible",
+    async () => {
+      for (const fn of [
+        "private.create_project_invitation_with_mode(uuid,text)",
+        "public.create_project_invitation_with_mode(uuid,text)",
+      ]) {
+        const row = (
+          await db.query(
+            "select has_function_privilege('anon',$1,'execute') anon, has_function_privilege('authenticated',$1,'execute') auth, has_function_privilege('service_role',$1,'execute') service",
+            [fn],
+          )
+        ).rows[0];
+        assert.deepEqual(row, { anon: false, auth: true, service: false });
+      }
+      await rejected(() => inviteMode(ids.member, project, "group"), "42501");
+      await rejected(() => inviteMode(null, project, "group"), "42501");
+      await rejected(
+        () =>
+          asUser(
+            null,
+            (c) =>
+              c.query(
+                "select * from public.create_project_invitation_with_mode($1,'group')",
+                [project],
+              ),
+            "anon",
+          ),
+        "42501",
+      );
+      await rejected(
+        () =>
+          asUser(ids.admin, (c) =>
+            c.query("select * from private.project_invitations"),
+          ),
+        "42501",
+      );
+      await inviteMode(ids.admin, project, "group");
+      assert.equal(
+        (
+          await db.query(
+            "select 1 from public.project_members where project_id=$1 and user_id=$2",
+            [project, ids.admin],
+          )
+        ).rowCount,
+        0,
+      );
+    },
+  );
+  await check(
+    "server limits modes to fixed one-hour group or 24-hour single",
+    async () => {
+      for (const mode of ["single", "group"]) {
+        const link = await inviteMode(ids.owner, project, mode);
+        const row = (
+          await db.query(
+            "select mode,extract(epoch from expires_at-created_at)::int seconds from private.project_invitations where token_hash=decode($1,'hex')",
+            [storedHash(link.token)],
+          )
+        ).rows[0];
+        assert.deepEqual(row, {
+          mode,
+          seconds: mode === "single" ? 86400 : 3600,
+        });
+      }
+      const legacy = await invite(ids.owner, project);
+      assert.equal(
+        (
+          await db.query(
+            "select mode from private.project_invitations where token_hash=decode($1,'hex')",
+            [storedHash(legacy.token)],
+          )
+        ).rows[0].mode,
+        "single",
+      );
+      const beforeCount = (
+        await db.query("select count(*) count from private.project_invitations")
+      ).rows[0].count;
+      for (const mode of ["unlimited", "", null])
+        await rejected(() => inviteMode(ids.owner, project, mode), "22023");
+      assert.equal(
+        (
+          await db.query(
+            "select count(*) count from private.project_invitations",
+          )
+        ).rows[0].count,
+        beforeCount,
+      );
+    },
+  );
+  const groupProject = await createProject(ids.owner, "Group mode sequential");
+  const groupLink = await inviteMode(ids.owner, groupProject, "group");
+  await check(
+    "one-hour group link joins multiple new users as members without consumption",
+    async () => {
+      for (const actor of [ids.racer1, ids.racer2])
+        assert.equal(await redeem(actor, groupLink.token), groupProject);
+      assert.equal(
+        (
+          await db.query(
+            "select 1 from public.project_members where project_id=$1 and role='member'",
+            [groupProject],
+          )
+        ).rowCount,
+        2,
+      );
+      assert.equal(
+        (
+          await db.query(
+            "select consumed_at from private.project_invitations where token_hash=decode($1,'hex')",
+            [storedHash(groupLink.token)],
+          )
+        ).rows[0].consumed_at,
+        null,
+      );
+      assert.equal(await redeem(ids.racer1, groupLink.token), groupProject);
+      await asUser(ids.racer2, async (c) =>
+        assert.equal(
+          (
+            await c.query("select id,name from public.projects where id=$1", [
+              groupProject,
+            ])
+          ).rowCount,
+          1,
+        ),
+      );
+    },
+  );
+  await check(
+    "expired group link rejects new users and leaves existing member access intact",
+    async () => {
+      await db.query(
+        "with timing as materialized (select clock_timestamp()-interval '2 hours' issued) update private.project_invitations set created_at=timing.issued,expires_at=timing.issued+interval '1 hour' from timing where token_hash=decode($1,'hex')",
+        [storedHash(groupLink.token)],
+      );
+      await rejected(() => redeem(ids.other, groupLink.token), "P0001");
+      assert.equal(await redeem(ids.racer1, groupLink.token), groupProject);
+      assert.equal(
+        (
+          await db.query(
+            "select 1 from public.project_members where project_id=$1 and user_id=$2",
+            [groupProject, ids.other],
+          )
+        ).rowCount,
+        0,
+      );
+    },
+  );
+  await check(
+    "concurrent group redemption admits both new users and retains reusable invitation",
+    async () => {
+      const targetProject = await createProject(
+        ids.owner,
+        "Group mode concurrent",
+      );
+      const link = await inviteMode(ids.owner, targetProject, "group");
+      const first = await beginAs(ids.racer1);
+      const second = await beginAs(ids.racer2);
+      const pid = (await second.query("select pg_backend_pid() pid")).rows[0]
+        .pid;
+      await first.query("select * from public.redeem_project_invitation($1)", [
+        sha(link.token),
+      ]);
+      const pending = second.query(
+        "select * from public.redeem_project_invitation($1)",
+        [sha(link.token)],
+      );
+      await assertWaiting(pid);
+      await first.query("commit");
+      assert.equal((await pending).rows[0].project_id, targetProject);
+      await second.query("commit");
+      assert.equal(
+        (
+          await db.query(
+            "select 1 from public.project_members where project_id=$1 and role='member'",
+            [targetProject],
+          )
+        ).rowCount,
+        2,
+      );
+      assert.equal(
+        (
+          await db.query(
+            "select consumed_at from private.project_invitations where token_hash=decode($1,'hex')",
+            [storedHash(link.token)],
+          )
+        ).rows[0].consumed_at,
+        null,
+      );
+      await first.end();
+      await second.end();
+      connections.delete(first);
+      connections.delete(second);
+    },
+  );
+  await check(
+    "24-hour single mode still rejects a second new user",
+    async () => {
+      const targetProject = await createProject(
+        ids.owner,
+        "Single mode regression",
+      );
+      const link = await inviteMode(ids.owner, targetProject, "single");
+      assert.equal(await redeem(ids.racer1, link.token), targetProject);
+      await rejected(() => redeem(ids.racer2, link.token), "P0001");
+      assert.equal(await redeem(ids.racer1, link.token), targetProject);
+    },
+  );
+  await check(
+    "single mode retains one-winner behavior after the mode migration",
+    () => race(false),
+  );
   console.log(
     `Database invitation checks: ${passed} passed; local fixtures only, no remote writes.`,
   );
@@ -847,3 +1110,6 @@ try {
   );
   await rm(safeDirectory, { recursive: true, force: true });
 }
+// embedded-postgres registers an exit hook; explicitly preserve a failed check's
+// exit status rather than relying on natural process termination.
+process.exit(process.exitCode ?? 0);

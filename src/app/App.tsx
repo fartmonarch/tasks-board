@@ -2,7 +2,7 @@ import "./App.css";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Input, Modal, Select } from "antd";
-import { Link, Navigate, Route, Routes, useParams } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { TaskCard } from "../features/tasks/components/TaskCard";
 import { TaskDetailPanel } from "../features/tasks/components/TaskDetailPanel";
 import { TaskToolbar } from "../features/tasks/components/TaskToolbar";
@@ -32,6 +32,7 @@ import type { Task } from "../features/tasks/types";
 
 function BoardPage() {
   const { projectId } = useParams();
+  const navigate = useNavigate();
   const session = useAuthSession();
   const userId = session?.user.id;
   const projectQuery = useQuery({
@@ -174,6 +175,7 @@ function BoardPage() {
         <div>
           <p className="eyebrow">PROJECT TASKS / {projectQuery.data.name}</p>
           <h1>任务协作看板</h1>
+          <Button onClick={() => navigate("/projects")}>返回我的项目</Button>
           <p className="project-intro">
             把项目的下一步放在一起，清晰推进每一项工作。
           </p>
