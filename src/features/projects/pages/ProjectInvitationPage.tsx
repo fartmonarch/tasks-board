@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button } from "antd";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthSession } from "../../auth/AuthSessionContext";
+import { encodeProjectId } from "../projectIdCodec";
 import {
   readInvitationToken,
   redeemProjectInvitation,
@@ -19,7 +20,9 @@ export function ProjectInvitationPage() {
       await queryClient.invalidateQueries({
         queryKey: ["workspace", "projects", session?.user.id],
       });
-      navigate(`/projects/${projectId}/board`, { replace: true });
+      navigate(`/projects/${encodeProjectId(projectId)}/board`, {
+        replace: true,
+      });
     },
   });
   return (

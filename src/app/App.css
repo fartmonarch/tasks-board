@@ -733,73 +733,6 @@ input {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.simple-page.settings-page {
-  width: min(100% - 64px, 1040px);
-  margin: 0 auto;
-  padding: 58px 0 84px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.settings-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 34px;
-}
-
-.settings-header .eyebrow { margin-bottom: 17px; color: #8b766a; }
-.settings-header .eyebrow span { margin: 0 8px; color: #c4bdb4; }
-.settings-header h1 { margin: 0; color: #292724; font-family: "Iowan Old Style", "Noto Serif SC", "Songti SC", Georgia, serif; font-size: clamp(34px, 4vw, 44px); font-weight: 500; letter-spacing: -.045em; line-height: 1.15; }
-.settings-intro { margin: 11px 0 0; color: #77736c; font-size: 13px; line-height: 1.65; }
-.settings-back { display: inline-flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid #c9c0b7; color: #6c6259; font-size: 12px; text-decoration: none; }
-.settings-back:hover { border-color: #ad563a; color: #ad563a; }
-
-.settings-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 660px) minmax(190px, 1fr);
-  align-items: start;
-  gap: clamp(26px, 5vw, 64px);
-}
-
-.settings-card {
-  padding: 27px 29px 26px;
-  border: 1px solid #e8e4dd;
-  border-radius: 11px;
-  background: #fffefa;
-  box-shadow: 0 3px 10px rgb(39 35 30 / 3%);
-}
-
-.settings-card__heading { padding-bottom: 20px; border-bottom: 1px solid #efede8; }
-.settings-card__heading h2 { margin: 0; color: #39352f; font-size: 15px; font-weight: 650; }
-.settings-card__heading p { margin: 7px 0 0; color: #89837a; font-size: 12px; line-height: 1.6; }
-.settings-loading { margin: 18px 0 0; color: #89837a; font-size: 12px; }
-.settings-form { display: grid; gap: 23px; max-width: none; margin: 0; padding-top: 23px; }
-.settings-field { display: grid; gap: 8px; }
-.settings-field label { color: #514b43; font-size: 12px; font-weight: 600; }
-.settings-field .ant-input { height: 43px; border-color: #ded9d1; border-radius: 7px; background: #fff; font-size: 13px; }
-.settings-field .ant-input:hover,
-.settings-field .ant-input:focus { border-color: #c38b73; }
-.settings-field .ant-input:focus { box-shadow: 0 0 0 2px rgb(173 86 58 / 10%) !important; }
-.settings-field > span { color: #9a948b; font-size: 10px; }
-.settings-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 17px; border-top: 1px solid #efede8; }
-.settings-actions > span { color: #89837a; font-size: 11px; line-height: 1.5; }
-.settings-actions .ant-btn { min-width: 122px; height: 38px; border-color: #a95337; background: #a95337; font-size: 12px; font-weight: 600; }
-.settings-actions .ant-btn:not(:disabled):hover { border-color: #91452f; background: #91452f; }
-.settings-note { padding: 14px 0 0 20px; border-left: 1px solid #e5e0d8; }
-.settings-note .eyebrow { margin-bottom: 14px; color: #a46d56; font-size: 9px; }
-.settings-note h2 { margin: 0 0 9px; color: #49443e; font-size: 14px; font-weight: 600; }
-.settings-note > p:last-child { margin: 0; color: #817b73; font-size: 12px; line-height: 1.8; }
-.settings-feedback { margin-top: 16px; border-radius: 7px; }
-
-@media (max-width: 720px) {
-  .settings-layout { grid-template-columns: 1fr; gap: 22px; }
-  .settings-note { padding: 4px 0 4px 15px; }
-}
-
 @media (max-width: 560px) {
   .board-entry-row { align-items: flex-end; flex-direction: row; gap: 7px; margin-bottom: 18px; }
   .board-entry-row .task-create-form { width: auto; min-width: 0; flex: 1 1 auto; }
@@ -808,12 +741,6 @@ input {
   .board-entry-row .board-refresh__button.ant-btn { width: 36px; min-width: 36px; height: 40px; }
   .kanban-create-button.ant-btn { width: 40px; min-width: 40px; height: 40px; padding: 0; font-size: 0; }
   .kanban-create-button.ant-btn .anticon { font-size: 14px; }
-  .simple-page.settings-page { width: calc(100% - 32px); padding: 32px 0 52px; }
-  .settings-header { align-items: flex-start; flex-direction: column; gap: 16px; margin-bottom: 24px; }
-  .settings-header h1 { font-size: 34px; }
-  .settings-card { padding: 21px 18px; }
-  .settings-actions { align-items: stretch; flex-direction: column; }
-  .settings-actions .ant-btn { width: 100%; }
   .board-toast { right: 16px; bottom: 16px; }
 }
 
@@ -1023,18 +950,6 @@ body {
   line-height: 1.7;
 }
 
-.profile-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 0;
-  color: #6c6259;
-  font-size: 13px;
-  text-decoration: none;
-  border-bottom: 1px solid #c9c0b7;
-}
-
-.profile-link:hover { color: #ad563a; border-color: #ad563a; }
 
 .project-nav {
   width: fit-content;

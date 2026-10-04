@@ -99,11 +99,12 @@ npm run test      # 运行 Vitest 测试
 
 | 路径 | 说明 |
 | --- | --- |
+| `/invite` | 通过邀请链接加入项目 |
 | `/projects` | 项目列表、加入项目和创建项目 |
-| `/projects/:projectId/board` | 指定项目的任务协作看板 |
-| `/settings` | 个人显示名称设置 |
+| `/projects/all` | 系统管理员查看全部项目 |
+| `/projects/:projectRef/board` | 指定项目的任务协作看板；UUID 会压缩为 22 位 Base64URL 字符串 |
 
-根路径 `/` 会重定向到 `/projects`。部署到静态托管服务时，需要将未知前端路由回退到 `index.html`，以支持直接访问和刷新上述路径。
+旧的完整 UUID 看板地址会重定向到压缩后的地址；上一版短路径 `/p/:projectId` 也会跳转到标准看板地址。根路径 `/` 会重定向到 `/projects`。部署到静态托管服务时，需要将未知前端路由回退到 `index.html`，以支持直接访问和刷新上述路径。
 
 ## 项目结构
 
