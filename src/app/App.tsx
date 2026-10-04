@@ -1,10 +1,11 @@
 import "./App.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Alert, Button, Input, Modal, Select } from "antd";
+import { Alert, Button, Drawer, Input, Modal, Select, Tooltip } from "antd";
+import { CheckCircleFilled, LeftOutlined, PlusOutlined, SettingOutlined, SyncOutlined } from "@ant-design/icons";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { TaskCard } from "../features/tasks/components/TaskCard";
 import { TaskDetailPanel } from "../features/tasks/components/TaskDetailPanel";
@@ -73,7 +74,6 @@ function BoardPage() {
     data: tasks = [],
     isPending,
     isError,
-    isFetching,
     error,
   } = useQuery({
     queryKey: ["tasks", userId, projectId],
@@ -96,14 +96,22 @@ function BoardPage() {
   const selectedTaskId = useTaskUiStore((state) => state.selectedTaskId);
   const closeTask = useTaskUiStore((state) => state.closeTask);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [projectManagementOpen, setProjectManagementOpen] = useState(false);
+  const [manualRefreshPending, setManualRefreshPending] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [actionError, setActionError] = useState("");
   const [actionNotice, setActionNotice] = useState("");
+  useEffect(() => {
+    if (!actionNotice) return;
+    const timeoutId = window.setTimeout(() => setActionNotice(""), 3200);
+    return () => window.clearTimeout(timeoutId);
+  }, [actionNotice]);
   const refreshTasks = () =>
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
   const manuallyRefreshTasks = async () => {
     setActionNotice("");
     setActionError("");
+    setManualRefreshPending(true);
     try {
       await queryClient.refetchQueries(
         { queryKey: ["tasks"], type: "active" },
@@ -112,6 +120,8 @@ function BoardPage() {
       setActionNotice("任务和已打开的详情已更新。");
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "刷新失败，请重试。");
+    } finally {
+      setManualRefreshPending(false);
     }
   };
   const createMutation = useMutation({
@@ -298,49 +308,75 @@ function BoardPage() {
   return (
     <main className="kanban-page">
       <header className="kanban-header">
-        <div>
-          <p className="eyebrow">PROJECT TASKS / {projectQuery.data.name}</p>
-          <h1>任务协作看板</h1>
-          <Button onClick={() => navigate("/projects")}>返回我的项目</Button>
-          <p className="project-intro">
-            把项目的下一步放在一起，清晰推进每一项工作。
-          </p>
-          {!isArchived && <ProjectInviteButton key={projectId} projectId={projectId} />}
+        <div className="kanban-heading">
+          <p className="eyebrow"><Link to="/projects">我的项目</Link><span aria-hidden="true">/</span>{projectQuery.data.name}</p>
+          <h1>任务看板</h1>
+          <p className="project-intro">把项目的下一步放在一起，清晰推进每一项工作。</p>
+          {isArchived && <span className="project-state-tag">已归档</span>}
         </div>
-        {!isArchived && <form
-          className="task-create-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const title = newTaskTitle.trim();
-            if (title && !createMutation.isPending)
-              createMutation.mutate(title);
-          }}
-        >
-          <label className="task-create-label" htmlFor="new-task-title">
-            新建任务
-          </label>
-          <div className="task-create-controls">
-            <Input
-              id="new-task-title"
-              className="task-create-input"
-              value={newTaskTitle}
-              maxLength={120}
-              onChange={(event) => setNewTaskTitle(event.target.value)}
-              placeholder="例如：整理本周迭代计划"
-              aria-label="新任务标题"
-            />
-            <Button
-              className="kanban-create-button"
-              type="primary"
-              htmlType="submit"
-              loading={createMutation.isPending}
-              disabled={!newTaskTitle.trim()}
-            >
-              创建任务
-            </Button>
-          </div>
-        </form>}
+        <div className="kanban-header-actions">
+          {!isArchived && <ProjectInviteButton key={projectId} projectId={projectId} />}
+          <Button
+            className="project-management-trigger"
+            icon={<SettingOutlined />}
+            onClick={() => setProjectManagementOpen(true)}
+          >
+            项目管理
+          </Button>
+          <Button onClick={() => navigate("/projects")}>返回项目</Button>
+        </div>
       </header>
+      <div className="board-entry-row">
+        {!isArchived && (
+          <form
+            className="task-create-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const title = newTaskTitle.trim();
+              if (title && !createMutation.isPending)
+                createMutation.mutate(title);
+            }}
+          >
+            <label className="task-create-label" htmlFor="new-task-title">
+              添加一项任务
+            </label>
+            <div className="task-create-controls">
+              <Input
+                id="new-task-title"
+                className="task-create-input"
+                value={newTaskTitle}
+                maxLength={120}
+                onChange={(event) => setNewTaskTitle(event.target.value)}
+                placeholder="写下接下来要做的事"
+                aria-label="新任务标题"
+              />
+              <Button
+                className="kanban-create-button"
+                type="primary"
+                htmlType="submit"
+                icon={<PlusOutlined />}
+                aria-label="添加任务"
+                loading={createMutation.isPending}
+                disabled={!newTaskTitle.trim()}
+              >
+                添加任务
+              </Button>
+            </div>
+          </form>
+        )}
+        <div className="board-refresh">
+          <Tooltip title="立即刷新任务">
+            <Button
+              className="board-refresh__button"
+              type="text"
+              icon={<SyncOutlined />}
+              aria-label="立即刷新任务"
+              onClick={() => void manuallyRefreshTasks()}
+              loading={manualRefreshPending}
+            />
+          </Tooltip>
+        </div>
+      </div>
       {isArchived && <Alert className="board-alert" type="info" showIcon
         title="项目已归档" description="任务和评论可查看，恢复项目后才能继续修改。" />}
       {actionError && (
@@ -355,8 +391,10 @@ function BoardPage() {
         />
       )}
       {actionNotice && (
-        <Alert className="board-alert" type="success" showIcon closable
-          title={actionNotice} onClose={() => setActionNotice("")} />
+        <div className="board-toast" role="status" aria-live="polite">
+          <CheckCircleFilled aria-hidden="true" />
+          <span>{actionNotice}</span>
+        </div>
       )}
       {(adminQuery.isError || roleQuery.isError) && (
         <Alert className="board-alert" type="error" showIcon
@@ -373,10 +411,6 @@ function BoardPage() {
           description={error.message}
           action={<Button onClick={() => void manuallyRefreshTasks()}>重试</Button>} />
       )}
-      <div className="board-refresh">
-        <span>页面可见时约每 10 秒更新；切回页面也会刷新。</span>
-        <Button onClick={() => void manuallyRefreshTasks()} loading={isFetching}>刷新任务</Button>
-      </div>
       {!isArchived && <p className={`board-drag-hint${canReorder ? "" : " board-drag-hint--muted"}`}>
         {canReorder ? "拖动卡片左上角手柄可调整顺序或移动状态。" : "清空搜索并选择“全部状态”后可拖动排序。"}
         {reorderMutation.isPending && <span role="status"> 正在保存排序…</span>}
@@ -419,11 +453,30 @@ function BoardPage() {
         </DndContext>
       )}
       <TaskDetailPanel projectId={projectId} userId={userId!} readOnly={isArchived} />
-      <ProjectManagement project={projectQuery.data} members={membersQuery.data ?? []}
-        membersPending={membersQuery.isPending} membersError={membersQuery.error?.message}
-        onRetryMembers={() => void membersQuery.refetch()}
-        isOwner={roleQuery.data === "owner"} isAdmin={adminQuery.data === true}
-        currentUserId={userId!} />
+      <Drawer
+        className="project-management-drawer"
+        title="项目管理"
+        placement="right"
+        size={480}
+        open={projectManagementOpen}
+        onClose={() => setProjectManagementOpen(false)}
+        destroyOnHidden
+        styles={{
+          mask: { background: "rgb(42 38 33 / 18%)", backdropFilter: "blur(6px)" },
+          section: {
+            background: "rgb(250 249 246 / 72%)",
+            backdropFilter: "blur(28px) saturate(140%)",
+            boxShadow: "-12px 0 36px rgb(35 30 24 / 8%)",
+          },
+          body: { padding: 0 },
+        }}
+      >
+        <ProjectManagement project={projectQuery.data} members={membersQuery.data ?? []}
+          membersPending={membersQuery.isPending} membersError={membersQuery.error?.message}
+          onRetryMembers={() => void membersQuery.refetch()}
+          isOwner={roleQuery.data === "owner"} isAdmin={adminQuery.data === true}
+          currentUserId={userId!} />
+      </Drawer>
       <Modal
         title="编辑任务"
         open={editingTask !== null && !isArchived}
@@ -552,10 +605,15 @@ function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
   if (showAll && adminQuery.data === false) return <Navigate to="/projects" replace />;
 
   return (
-    <main className="simple-page">
-      <p className="eyebrow">PROJECT TASKS</p>
-      <h1>{showAll ? "全部项目" : "我的项目"}</h1>
-      <Link to="/settings">设置我的显示名称 →</Link>
+    <main className="simple-page projects-page">
+      <header className="projects-header">
+        <div>
+          <p className="eyebrow">PROJECT TASKS <span aria-hidden="true">/</span> WORKSPACE</p>
+          <h1>{showAll ? "全部项目" : "我的项目"}</h1>
+          <p className="projects-intro">让每个项目的进度与协作，都有一个清晰的位置。</p>
+        </div>
+        <Link className="profile-link" to="/settings">个人资料 <span aria-hidden="true">↗</span></Link>
+      </header>
       <nav className="project-nav" aria-label="项目列表范围">
         <Link className={!showAll ? "project-nav__active" : ""} to="/projects">
           我的项目
@@ -596,57 +654,73 @@ function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
         />
       )}
       {projects && (
-        <>
-          <section
-            className="project-list"
-            aria-labelledby="project-list-title"
-          >
-            <h2 id="project-list-title">{showAll ? "全部项目" : "我的项目"}</h2>
+        <div className={`projects-layout${showAll ? " projects-layout--all" : ""}`}>
+          <section className="project-list" aria-labelledby="project-list-title">
+            <div className="project-list__heading">
+              <h2 id="project-list-title">项目空间</h2>
+              <span>{projects.length} 个项目</span>
+            </div>
             {projects.length === 0 ? (
-              <p>{showAll ? "目前没有项目。" : "还没有创建或加入的项目。可新建项目，或向项目组长获取邀请链接。"}</p>
+              <div className="projects-empty">
+                <span className="projects-empty__mark" aria-hidden="true">＋</span>
+                <h3>{showAll ? "目前没有项目" : "这里还没有项目"}</h3>
+                <p>{showAll ? "目前没有可展示的项目。" : "创建一个项目，或通过组长分享的邀请链接加入。"}</p>
+              </div>
             ) : (
-              projects.map((project) => (
-                <Link
-                  className="project-list__item"
-                  key={project.id}
-                  to={`/projects/${project.id}/board`}
-                >
-                  <span>
-                    {project.name}{"role" in project && project.role === "owner" ? "（组长）" : ""}
-                    {project.archivedAt ? " · 已归档" : ""}
-                  </span>
-                  <span aria-hidden="true">→</span>
-                </Link>
-              ))
+              <div className="project-list__items">
+                {projects.map((project) => (
+                  <Link
+                    className="project-list__item"
+                    key={project.id}
+                    to={`/projects/${project.id}/board`}
+                  >
+                    <span className="project-list__symbol" aria-hidden="true">{project.name.slice(0, 1)}</span>
+                    <span className="project-list__copy">
+                      <strong>{project.name}</strong>
+                      <span>
+                        {"role" in project && project.role
+                          ? project.role === "owner" ? "组长" : "协作者"
+                          : showAll ? "管理员视图" : "协作者"}
+                        {project.archivedAt ? " · 已归档" : ""}
+                      </span>
+                    </span>
+                    <span className="project-list__arrow" aria-hidden="true">↗</span>
+                  </Link>
+                ))}
+              </div>
             )}
           </section>
-          {!showAll && <form
-            className="project-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (projectName.trim())
-                createProjectMutation.mutate(projectName.trim());
-            }}
-          >
-            <h2>新建项目</h2>
-            <label htmlFor="new-project-name">项目名称</label>
-            <Input
-              id="new-project-name"
-              value={projectName}
-              maxLength={120}
-              onChange={(event) => setProjectName(event.target.value)}
-              placeholder="例如：产品迭代"
-            />
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={createProjectMutation.isPending}
-              disabled={!projectName.trim()}
+          {!showAll && <aside className="project-create-panel">
+            <p className="eyebrow">NEW SPACE</p>
+            <h2>开启一个新项目</h2>
+            <p className="project-create-panel__intro">从清晰的目标开始，和团队一起推进。</p>
+            <form
+              className="project-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (projectName.trim())
+                  createProjectMutation.mutate(projectName.trim());
+              }}
             >
-              创建项目
-            </Button>
-          </form>}
-        </>
+              <label htmlFor="new-project-name">项目名称</label>
+              <Input
+                id="new-project-name"
+                value={projectName}
+                maxLength={120}
+                onChange={(event) => setProjectName(event.target.value)}
+                placeholder="例如：产品迭代"
+              />
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={createProjectMutation.isPending}
+                disabled={!projectName.trim()}
+              >
+                创建项目
+              </Button>
+            </form>
+          </aside>}
+        </div>
       )}
     </main>
   );
@@ -675,63 +749,92 @@ function SettingsPage() {
   });
   if (!supabase)
     return (
-      <main className="simple-page">
-        <h1>设置</h1>
+      <main className="simple-page settings-page">
+        <header className="settings-header">
+          <div>
+            <p className="eyebrow">PREFERENCES <span aria-hidden="true">/</span> PROFILE</p>
+            <h1>个人资料</h1>
+          </div>
+          <Link className="settings-back" to="/projects"><LeftOutlined /> 返回项目</Link>
+        </header>
         <Alert type="info" showIcon message="演示模式下不能保存资料" />
       </main>
     );
   return (
-    <main className="simple-page">
-      <p className="eyebrow">PREFERENCES</p>
-      <h1>个人资料</h1>
-      <p>负责人姓名保存在个人资料中，任务只关联负责人账号。</p>
-      {profileQuery.isPending && <p>正在加载资料……</p>}
-      {profileQuery.isError && (
-        <Alert
-          type="error"
-          showIcon
-          message="资料加载失败"
-          description={profileQuery.error.message}
-        />
-      )}
-      {saveMutation.isError && (
-        <Alert
-          className="project-alert"
-          type="error"
-          showIcon
-          message="保存失败"
-          description={saveMutation.error.message}
-        />
-      )}
-      <form
-        className="project-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (currentDisplayName.trim())
-            saveMutation.mutate(currentDisplayName);
-        }}
-      >
-        <label htmlFor="profile-display-name">显示名称</label>
-        <Input
-          id="profile-display-name"
-          value={currentDisplayName}
-          maxLength={100}
-          onChange={(event) => setDisplayName(event.target.value)}
-          placeholder="输入负责人显示名称"
-        />
-        <Button
-          type="primary"
-          htmlType="submit"
-          loading={saveMutation.isPending}
-          disabled={!currentDisplayName.trim()}
-        >
-          保存名称
-        </Button>
-      </form>
-      {saveMutation.isSuccess && (
-        <Alert type="success" showIcon message="名称已保存" />
-      )}
-      <Link to="/projects">返回项目</Link>
+    <main className="simple-page settings-page">
+      <header className="settings-header">
+        <div>
+          <p className="eyebrow">PREFERENCES <span aria-hidden="true">/</span> PROFILE</p>
+          <h1>个人资料</h1>
+          <p className="settings-intro">设置在项目成员、任务负责人和评论中显示的名称。</p>
+        </div>
+        <Link className="settings-back" to="/projects"><LeftOutlined /> 返回项目</Link>
+      </header>
+      <div className="settings-layout">
+        <section className="settings-card" aria-labelledby="settings-profile-title">
+          <div className="settings-card__heading">
+            <h2 id="settings-profile-title">协作资料</h2>
+            <p>你的账号邮箱不会公开显示，项目中只展示这个名称。</p>
+          </div>
+          {profileQuery.isPending && <p className="settings-loading">正在加载资料……</p>}
+          {profileQuery.isError && (
+            <Alert
+              type="error"
+              showIcon
+              title="资料加载失败"
+              description={profileQuery.error.message}
+            />
+          )}
+          {saveMutation.isError && (
+            <Alert
+              className="settings-feedback"
+              type="error"
+              showIcon
+              title="保存失败"
+              description={saveMutation.error.message}
+            />
+          )}
+          <form
+            className="settings-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (currentDisplayName.trim())
+                saveMutation.mutate(currentDisplayName);
+            }}
+          >
+            <div className="settings-field">
+              <label htmlFor="profile-display-name">显示名称</label>
+              <Input
+                id="profile-display-name"
+                value={currentDisplayName}
+                maxLength={100}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="例如：林然"
+              />
+              <span>最多 100 个字符</span>
+            </div>
+            <div className="settings-actions">
+              <span>保存后会同步到你参与的项目</span>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={saveMutation.isPending}
+                disabled={!currentDisplayName.trim()}
+              >
+                保存更改
+              </Button>
+            </div>
+          </form>
+          {saveMutation.isSuccess && (
+            <Alert className="settings-feedback" type="success" showIcon title="名称已保存" />
+          )}
+        </section>
+        <aside className="settings-note">
+          <p className="eyebrow">HOW IT APPEARS</p>
+          <h2>让协作更清楚</h2>
+          <p>显示名称会出现在任务负责人、项目成员列表和评论记录中，方便团队辨认彼此。</p>
+        </aside>
+      </div>
     </main>
   );
 }

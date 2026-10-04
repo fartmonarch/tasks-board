@@ -1,5 +1,12 @@
-import { Button, Popconfirm, Select } from "antd";
-import { HolderOutlined } from "@ant-design/icons";
+import { Button, Popconfirm, Select, Tooltip } from "antd";
+import {
+  CheckOutlined,
+  CommentOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  HolderOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "../types";
@@ -20,26 +27,112 @@ type TaskCardProps = {
 export function TaskCard({ task, onComplete, onStatusChange, onEdit, onDelete, onOpenDetails, isThisTaskPending, canDelete, readOnly = false, isDraggable = false }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: !isDraggable || isThisTaskPending });
   const priorityLabels = { low: "低", medium: "中", high: "高" };
-  return <article ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.35 : undefined }} className={`task-card${isDragging ? " task-card--dragging" : ""}`}>
-    <div className="task-card__heading">
-      <h3 className="task-card__title">{task.title}</h3>
-      {isDraggable && <Button ref={setActivatorNodeRef} className="task-card__drag-handle" type="text" size="small"
-        icon={<HolderOutlined />} aria-label={`拖动任务：${task.title}`} title="拖动调整顺序" {...attributes} {...listeners} />}
-    </div>
-    <div className="task-card__info">
-      <p><span className="task-card__label">优先级</span><span className={`task-card__priority task-card__priority--${task.priority}`}>{priorityLabels[task.priority]}</span></p>
-      <p><span className="task-card__label">负责人</span><span>{task.assignee || "未分配"}</span></p>
-      <label className="task-card__status"><span className="task-card__label">状态</span>
-        <Select aria-label={`修改${task.title}状态`} size="small" value={task.status} disabled={isThisTaskPending || readOnly} onChange={(value) => onStatusChange(task.id, value)} options={[{ label: "待处理", value: "todo" }, { label: "进行中", value: "doing" }, { label: "已完成", value: "done" }]} />
-      </label>
-      <div className="task-card__actions">
-        {!readOnly && task.status !== "done" && <Button size="small" type="primary" loading={isThisTaskPending} onClick={() => onComplete(task.id)}>完成</Button>}
-        <Button size="small" onClick={() => onOpenDetails(task.id)}>评论</Button>
-        {!readOnly && <Button size="small" onClick={() => onEdit(task)}>编辑</Button>}
-        {canDelete && <Popconfirm title="删除这条任务？" description="相关评论也会一并删除。" okText="删除" cancelText="取消" onConfirm={() => onDelete(task.id)}>
-          <Button size="small" danger loading={isThisTaskPending}>删除</Button>
-        </Popconfirm>}
+  return (
+    <article
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.35 : undefined }}
+      className={`task-card${isDragging ? " task-card--dragging" : ""}`}
+    >
+      <div className="task-card__heading">
+        <h3 className="task-card__title">{task.title}</h3>
+        {isDraggable && (
+          <Tooltip title="拖动排序">
+            <Button
+              ref={setActivatorNodeRef}
+              className="task-card__drag-handle"
+              type="text"
+              size="small"
+              icon={<HolderOutlined />}
+              aria-label={`拖动任务：${task.title}`}
+              {...attributes}
+              {...listeners}
+            />
+          </Tooltip>
+        )}
       </div>
-    </div>
-  </article>;
+      <div className="task-card__meta">
+        <span className={`task-card__priority task-card__priority--${task.priority}`}>
+          {priorityLabels[task.priority]}优先级
+        </span>
+        <span className="task-card__assignee" title={task.assignee || "未分配负责人"}>
+          <UserOutlined aria-hidden="true" />
+          <span className="task-card__assignee-name">{task.assignee || "未分配"}</span>
+        </span>
+      </div>
+      <div className="task-card__footer">
+        <Select
+          className="task-card__status-select"
+          aria-label={`修改${task.title}状态`}
+          size="small"
+          value={task.status}
+          disabled={isThisTaskPending || readOnly}
+          onChange={(value) => onStatusChange(task.id, value)}
+          options={[
+            { label: "待处理", value: "todo" },
+            { label: "进行中", value: "doing" },
+            { label: "已完成", value: "done" },
+          ]}
+        />
+        <div className="task-card__actions" aria-label="任务操作">
+          {!readOnly && task.status !== "done" && (
+            <Tooltip title="标记为完成">
+              <Button
+                className="task-card__action task-card__action--complete"
+                size="small"
+                type="primary"
+                shape="circle"
+                icon={<CheckOutlined />}
+                aria-label={`完成任务：${task.title}`}
+                loading={isThisTaskPending}
+                onClick={() => onComplete(task.id)}
+              />
+            </Tooltip>
+          )}
+          <Tooltip title="查看评论">
+            <Button
+              className="task-card__action"
+              size="small"
+              shape="circle"
+              icon={<CommentOutlined />}
+              aria-label={`查看${task.title}的评论`}
+              onClick={() => onOpenDetails(task.id)}
+            />
+          </Tooltip>
+          {!readOnly && (
+            <Tooltip title="编辑任务">
+              <Button
+                className="task-card__action"
+                size="small"
+                shape="circle"
+                icon={<EditOutlined />}
+                aria-label={`编辑任务：${task.title}`}
+                onClick={() => onEdit(task)}
+              />
+            </Tooltip>
+          )}
+          {canDelete && (
+            <Popconfirm
+              title="删除这条任务？"
+              description="相关评论也会一并删除。"
+              okText="删除"
+              cancelText="取消"
+              onConfirm={() => onDelete(task.id)}
+            >
+              <Tooltip title="删除任务">
+                <Button
+                  className="task-card__action task-card__action--delete"
+                  size="small"
+                  danger
+                  shape="circle"
+                  icon={<DeleteOutlined />}
+                  aria-label={`删除任务：${task.title}`}
+                  loading={isThisTaskPending}
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
+        </div>
+      </div>
+    </article>
+  );
 }

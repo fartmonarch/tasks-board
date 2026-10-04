@@ -75,8 +75,7 @@ export function ProjectManagement({
     <section className="project-management" aria-labelledby="project-management-title">
       <div className="project-management__heading">
         <div>
-          <h2 id="project-management-title">项目管理</h2>
-          <p>成员与项目状态</p>
+          <h2 id="project-management-title">成员与项目状态</h2>
         </div>
         <Tag color={project.archivedAt ? "default" : "green"}>{project.archivedAt ? "已归档" : "进行中"}</Tag>
       </div>
