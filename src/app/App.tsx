@@ -1,15 +1,20 @@
 import "./App.css";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, useSensor, useSensors } from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Alert, Button, Input, Modal, Select } from "antd";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { TaskCard } from "../features/tasks/components/TaskCard";
 import { TaskDetailPanel } from "../features/tasks/components/TaskDetailPanel";
 import { TaskToolbar } from "../features/tasks/components/TaskToolbar";
+import { TaskBoardColumn } from "../features/tasks/components/TaskBoardColumn";
 import {
   createTask,
   deleteTask,
   getTasks,
+  persistTaskOrder,
   updateTask,
 } from "../features/tasks/api/taskApi";
 import {
@@ -46,6 +51,12 @@ function BoardPage() {
     refetchInterval: 10_000,
     refetchOnWindowFocus: "always",
   });
+  const isArchived = Boolean(projectQuery.data?.archivedAt);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const adminQuery = useQuery({
     queryKey: ["currentUserIsSystemAdmin", userId],
     queryFn: getCurrentUserIsSystemAdmin,
@@ -143,6 +154,28 @@ function BoardPage() {
       await refreshTasks();
     },
   });
+  const reorderMutation = useMutation({
+    mutationFn: (ordered: Task[]) => persistTaskOrder(projectId!, ordered),
+    onMutate: async (ordered) => {
+      const key = ["tasks", userId, projectId];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<Task[]>(key);
+      queryClient.setQueryData(key, ordered);
+      return { previous };
+    },
+    onSuccess: async () => {
+      setActionError("");
+      setActionNotice("任务排序已保存。其他协作者稍后会自动看到更新。");
+      await refreshTasks();
+    },
+    onError: async (e, _ordered, context) => {
+      const key = ["tasks", userId, projectId];
+      if (context?.previous) queryClient.setQueryData(key, context.previous);
+      setActionNotice("");
+      setActionError(e.message);
+      await refreshTasks();
+    },
+  });
 
   if (!supabase)
     return (
@@ -188,7 +221,10 @@ function BoardPage() {
       </main>
     );
 
-  const visibleTasks = filterTasks(tasks, search, statusFilter);
+  const orderedTasks = [...tasks].sort((a, b) =>
+    (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER),
+  );
+  const visibleTasks = filterTasks(orderedTasks, search, statusFilter);
   const columns: Array<{
     status: Task["status"];
     title: string;
@@ -214,11 +250,50 @@ function BoardPage() {
     (updateMutation.isPending && updateMutation.variables.id === id) ||
     (deleteMutation.isPending && deleteMutation.variables === id);
   const canDeleteTask = (task: Task) =>
-    !projectQuery.data.archivedAt && (
+    !isArchived && (
       adminQuery.data === true ||
       roleQuery.data === "owner" ||
       (roleQuery.data === "member" && task.createdBy === userId));
-  const isArchived = Boolean(projectQuery.data.archivedAt);
+  const canReorder = !isArchived && !search.trim() && statusFilter === "all";
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || !canReorder || reorderMutation.isPending) return;
+    const activeTask = orderedTasks.find((task) => task.id === active.id);
+    if (!activeTask || String(over.id) === activeTask.id) return;
+    const statuses: Task["status"][] = ["todo", "doing", "done"];
+    const destination = statuses.includes(over.id as Task["status"])
+      ? over.id as Task["status"]
+      : orderedTasks.find((task) => task.id === over.id)?.status;
+    if (!destination) return;
+    const lists = Object.fromEntries(statuses.map((status) => [
+      status,
+      orderedTasks.filter((task) => task.status === status),
+    ])) as Record<Task["status"], Task[]>;
+    const sourceList = lists[activeTask.status];
+    const sourceIndex = sourceList.findIndex((task) => task.id === activeTask.id);
+    if (sourceIndex < 0) return;
+    if (activeTask.status === destination) {
+      const targetIndex = over.id === destination
+        ? sourceList.length - 1
+        : sourceList.findIndex((task) => task.id === over.id);
+      if (targetIndex < 0 || targetIndex === sourceIndex) return;
+      lists[destination] = arrayMove(sourceList, sourceIndex, targetIndex);
+    } else {
+      lists[activeTask.status] = sourceList.filter((task) => task.id !== activeTask.id);
+      const destinationList = lists[destination];
+      const targetIndex = over.id === destination
+        ? destinationList.length
+        : destinationList.findIndex((task) => task.id === over.id);
+      const insertAt = targetIndex < 0 ? destinationList.length : targetIndex;
+      const movedTask = { ...activeTask, status: destination };
+      lists[destination] = [...destinationList.slice(0, insertAt), movedTask, ...destinationList.slice(insertAt)];
+    }
+    const next = statuses.flatMap((status) => lists[status].map((task, sortOrder) => ({
+      ...task,
+      status,
+      sortOrder,
+    })));
+    reorderMutation.mutate(next);
+  };
 
   return (
     <main className="kanban-page">
@@ -302,6 +377,10 @@ function BoardPage() {
         <span>页面可见时约每 10 秒更新；切回页面也会刷新。</span>
         <Button onClick={() => void manuallyRefreshTasks()} loading={isFetching}>刷新任务</Button>
       </div>
+      {!isArchived && <p className={`board-drag-hint${canReorder ? "" : " board-drag-hint--muted"}`}>
+        {canReorder ? "拖动卡片左上角手柄可调整顺序或移动状态。" : "清空搜索并选择“全部状态”后可拖动排序。"}
+        {reorderMutation.isPending && <span role="status"> 正在保存排序…</span>}
+      </p>}
       <TaskToolbar visibleTasksLength={visibleTasks.length} />
       {tasks.length === 0 ? (
         <section className="board-welcome">
@@ -315,41 +394,29 @@ function BoardPage() {
           <p>试试其他关键词或筛选条件。</p>
         </section>
       ) : (
-        <section className="kanban-board" aria-label="任务看板">
-          {columns.map((column) => (
-            <section
-              className={`kanban-column kanban-column--${column.status}`}
-              key={column.status}
-              aria-label={column.title}
-            >
-              <div className="kanban-column__header">
-                <h2>{column.title}</h2>
-                <span>{column.tasks.length}</span>
-              </div>
-              {column.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onComplete={(id) =>
-                    updateMutation.mutate({ id, changes: { status: "done" } })
-                  }
-                  onStatusChange={(id, status) =>
-                    updateMutation.mutate({ id, changes: { status } })
-                  }
-                  onEdit={setEditingTask}
-                  onDelete={(id) => deleteMutation.mutate(id)}
-                  canDelete={canDeleteTask(task)}
-                  readOnly={isArchived}
-                  onOpenDetails={openTask}
-                  isThisTaskPending={isPendingTask(task.id)}
-                />
-              ))}
-              {column.tasks.length === 0 && (
-                <p className="kanban-empty">此状态暂无任务</p>
-              )}
-            </section>
-          ))}
-        </section>
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+          <section className="kanban-board" aria-label="任务看板">
+            {columns.map((column) => (
+              <TaskBoardColumn key={column.status} status={column.status} title={column.title} tasks={column.tasks}>
+                {column.tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onComplete={(id) => updateMutation.mutate({ id, changes: { status: "done" } })}
+                    onStatusChange={(id, status) => updateMutation.mutate({ id, changes: { status } })}
+                    onEdit={setEditingTask}
+                    onDelete={(id) => deleteMutation.mutate(id)}
+                    canDelete={canDeleteTask(task)}
+                    readOnly={isArchived}
+                    isDraggable={canReorder && !reorderMutation.isPending}
+                    onOpenDetails={openTask}
+                    isThisTaskPending={isPendingTask(task.id)}
+                  />
+                ))}
+              </TaskBoardColumn>
+            ))}
+          </section>
+        </DndContext>
       )}
       <TaskDetailPanel projectId={projectId} userId={userId!} readOnly={isArchived} />
       <ProjectManagement project={projectQuery.data} members={membersQuery.data ?? []}

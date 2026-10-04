@@ -6,6 +6,7 @@ export type Task = {
   assignee: string;
   assigneeUserId: string | null;
   createdBy: string;
+  sortOrder?: number;
 };
 
 export type TaskComment = {

@@ -1,4 +1,7 @@
 import { Button, Popconfirm, Select } from "antd";
+import { HolderOutlined } from "@ant-design/icons";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "../types";
 
 type TaskCardProps = {
@@ -11,12 +14,18 @@ type TaskCardProps = {
   isThisTaskPending: boolean;
   canDelete: boolean;
   readOnly?: boolean;
+  isDraggable?: boolean;
 };
 
-export function TaskCard({ task, onComplete, onStatusChange, onEdit, onDelete, onOpenDetails, isThisTaskPending, canDelete, readOnly = false }: TaskCardProps) {
+export function TaskCard({ task, onComplete, onStatusChange, onEdit, onDelete, onOpenDetails, isThisTaskPending, canDelete, readOnly = false, isDraggable = false }: TaskCardProps) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: !isDraggable || isThisTaskPending });
   const priorityLabels = { low: "低", medium: "中", high: "高" };
-  return <article className="task-card">
-    <h3 className="task-card__title">{task.title}</h3>
+  return <article ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.35 : undefined }} className={`task-card${isDragging ? " task-card--dragging" : ""}`}>
+    <div className="task-card__heading">
+      <h3 className="task-card__title">{task.title}</h3>
+      {isDraggable && <Button ref={setActivatorNodeRef} className="task-card__drag-handle" type="text" size="small"
+        icon={<HolderOutlined />} aria-label={`拖动任务：${task.title}`} title="拖动调整顺序" {...attributes} {...listeners} />}
+    </div>
     <div className="task-card__info">
       <p><span className="task-card__label">优先级</span><span className={`task-card__priority task-card__priority--${task.priority}`}>{priorityLabels[task.priority]}</span></p>
       <p><span className="task-card__label">负责人</span><span>{task.assignee || "未分配"}</span></p>

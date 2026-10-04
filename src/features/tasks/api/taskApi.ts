@@ -9,6 +9,7 @@ type TaskRow = {
   priority: Task["priority"];
   assignee_user_id: string | null;
   created_by: string;
+  sort_order: number;
 };
 
 function requireSupabase() {
@@ -40,14 +41,29 @@ async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
     assigneeUserId: row.assignee_user_id,
     createdBy: row.created_by,
     assignee: row.assignee_user_id ? profiles.get(row.assignee_user_id) ?? "未设置姓名" : "未分配",
+    sortOrder: row.sort_order,
   }));
+}
+
+async function getNextSortOrder(projectId: string, status: Task["status"]): Promise<number> {
+  const { data, error } = await requireSupabase()
+    .from("tasks")
+    .select("sort_order")
+    .eq("project_id", projectId)
+    .eq("status", status)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.sort_order ?? -1) + 1;
 }
 
 export async function getTasks(projectId: string): Promise<Task[]> {
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .select("id, title, status, priority, assignee_user_id, created_by")
+    .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
     .eq("project_id", projectId)
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
   if (error) throw error;
   return mapTasks((data ?? []) as TaskRow[]);
@@ -56,7 +72,7 @@ export async function getTasks(projectId: string): Promise<Task[]> {
 export async function getTaskById(projectId: string, taskId: string): Promise<Task | undefined> {
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .select("id, title, status, priority, assignee_user_id, created_by")
+    .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
     .eq("project_id", projectId)
     .eq("id", taskId)
     .maybeSingle();
@@ -67,10 +83,11 @@ export async function getTaskById(projectId: string, taskId: string): Promise<Ta
 
 export async function createTask(projectId: string, title: string): Promise<Task> {
   const userId = await requireUserId();
+  const sortOrder = await getNextSortOrder(projectId, "todo");
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .insert({ project_id: projectId, title: title.trim(), created_by: userId })
-    .select("id, title, status, priority, assignee_user_id, created_by")
+    .insert({ project_id: projectId, title: title.trim(), created_by: userId, sort_order: sortOrder })
+    .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
     .single();
   if (error) throw error;
   return (await mapTasks([data as TaskRow]))[0];
@@ -81,6 +98,9 @@ export async function updateTask(
   taskId: string,
   changes: Partial<Pick<Task, "title" | "status" | "priority" | "assigneeUserId">>,
 ): Promise<Task> {
+  const sortOrder = changes.status === undefined
+    ? undefined
+    : await getNextSortOrder(projectId, changes.status);
   const { data, error } = await requireSupabase()
     .from("tasks")
     .update({
@@ -88,13 +108,26 @@ export async function updateTask(
       ...(changes.status === undefined ? {} : { status: changes.status }),
       ...(changes.priority === undefined ? {} : { priority: changes.priority }),
       ...(changes.assigneeUserId === undefined ? {} : { assignee_user_id: changes.assigneeUserId }),
+      ...(sortOrder === undefined ? {} : { sort_order: sortOrder }),
     })
     .eq("project_id", projectId)
     .eq("id", taskId)
-    .select("id, title, status, priority, assignee_user_id, created_by")
+    .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
     .single();
   if (error) throw error;
   return (await mapTasks([data as TaskRow]))[0];
+}
+
+export async function persistTaskOrder(
+  projectId: string,
+  orderedTasks: Array<Pick<Task, "id" | "status">>,
+): Promise<void> {
+  const { error } = await requireSupabase().rpc("reorder_project_tasks", {
+    target_project_id: projectId,
+    target_task_ids: orderedTasks.map((task) => task.id),
+    target_statuses: orderedTasks.map((task) => task.status),
+  });
+  if (error) throw error;
 }
 
 export async function deleteTask(projectId: string, taskId: string): Promise<void> {
