@@ -8,6 +8,7 @@ type TaskRow = {
   status: Task["status"];
   priority: Task["priority"];
   assignee_user_id: string | null;
+  created_by: string;
 };
 
 function requireSupabase() {
@@ -37,6 +38,7 @@ async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
     status: row.status,
     priority: row.priority,
     assigneeUserId: row.assignee_user_id,
+    createdBy: row.created_by,
     assignee: row.assignee_user_id ? profiles.get(row.assignee_user_id) ?? "未设置姓名" : "未分配",
   }));
 }
@@ -44,7 +46,7 @@ async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
 export async function getTasks(projectId: string): Promise<Task[]> {
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .select("id, title, status, priority, assignee_user_id")
+    .select("id, title, status, priority, assignee_user_id, created_by")
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -54,7 +56,7 @@ export async function getTasks(projectId: string): Promise<Task[]> {
 export async function getTaskById(projectId: string, taskId: string): Promise<Task | undefined> {
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .select("id, title, status, priority, assignee_user_id")
+    .select("id, title, status, priority, assignee_user_id, created_by")
     .eq("project_id", projectId)
     .eq("id", taskId)
     .maybeSingle();
@@ -68,7 +70,7 @@ export async function createTask(projectId: string, title: string): Promise<Task
   const { data, error } = await requireSupabase()
     .from("tasks")
     .insert({ project_id: projectId, title: title.trim(), created_by: userId })
-    .select("id, title, status, priority, assignee_user_id")
+    .select("id, title, status, priority, assignee_user_id, created_by")
     .single();
   if (error) throw error;
   return (await mapTasks([data as TaskRow]))[0];
@@ -89,15 +91,23 @@ export async function updateTask(
     })
     .eq("project_id", projectId)
     .eq("id", taskId)
-    .select("id, title, status, priority, assignee_user_id")
+    .select("id, title, status, priority, assignee_user_id, created_by")
     .single();
   if (error) throw error;
   return (await mapTasks([data as TaskRow]))[0];
 }
 
 export async function deleteTask(projectId: string, taskId: string): Promise<void> {
-  const { error } = await requireSupabase().from("tasks").delete().eq("project_id", projectId).eq("id", taskId);
+  const { data, error } = await requireSupabase()
+    .from("tasks")
+    .delete()
+    .eq("project_id", projectId)
+    .eq("id", taskId)
+    .select("id");
   if (error) throw error;
+  if (data?.length !== 1) {
+    throw new Error("任务未删除，可能已被其他成员删除或当前账号没有权限。请刷新后重试。");
+  }
 }
 
 export async function getTaskComments(taskId: string): Promise<TaskComment[]> {

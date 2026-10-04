@@ -3,9 +3,9 @@ import { filterTasks } from "./filterTasks";
 import type { Task } from "../types";
 
 const tasks: Task[] = [
-  { id: "task-1", title: "Prepare release notes", status: "todo", priority: "high", assignee: "A", assigneeUserId: null },
-  { id: "task-2", title: "Review API design", status: "doing", priority: "medium", assignee: "B", assigneeUserId: null },
-  { id: "task-3", title: "Release checklist", status: "done", priority: "low", assignee: "C", assigneeUserId: null },
+  { id: "task-1", title: "Prepare release notes", status: "todo", priority: "high", assignee: "A", assigneeUserId: null, createdBy: "user-id" },
+  { id: "task-2", title: "Review API design", status: "doing", priority: "medium", assignee: "B", assigneeUserId: null, createdBy: "user-id" },
+  { id: "task-3", title: "Release checklist", status: "done", priority: "low", assignee: "C", assigneeUserId: null, createdBy: "user-id" },
 ];
 
 describe("filterTasks", () => {

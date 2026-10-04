@@ -5,6 +5,7 @@ export type Task = {
   priority: "low" | "medium" | "high"; //优先级
   assignee: string;
   assigneeUserId: string | null;
+  createdBy: string;
 };
 
 export type TaskComment = {

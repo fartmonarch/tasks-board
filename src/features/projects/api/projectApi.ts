@@ -44,6 +44,36 @@ export async function getWorkspace() {
   })) as MyProject[] };
 }
 
+export async function getCurrentUserIsSystemAdmin(): Promise<boolean> {
+  const { data, error } = await requireSupabase().rpc("current_user_is_system_admin");
+  if (error) throw error;
+  return data === true;
+}
+
+export async function getCurrentProjectRole(
+  projectId: string,
+  userId: string,
+): Promise<MyProject["role"] | null> {
+  const { data, error } = await requireSupabase()
+    .from("project_members")
+    .select("role")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.role as MyProject["role"] | undefined) ?? null;
+}
+
+export async function getAllProjects(): Promise<ProjectSummary[]> {
+  const client = requireSupabase();
+  const { data: isAdmin, error: adminError } = await client.rpc("current_user_is_system_admin");
+  if (adminError) throw adminError;
+  if (isAdmin !== true) throw new Error("只有系统管理员可以查看全部项目。");
+  const { data, error } = await client.from("projects").select("id, name").order("name");
+  if (error) throw error;
+  return (data ?? []) as ProjectSummary[];
+}
+
 export async function getProjectById(projectId: string): Promise<ProjectSummary> {
   const { data, error } = await requireSupabase()
     .from("projects")

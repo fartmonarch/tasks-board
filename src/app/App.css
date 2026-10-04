@@ -347,6 +347,18 @@ input {
 
 .board-alert { margin: -10px 0 22px; }
 
+.board-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -12px 0 16px;
+  color: #718075;
+  font-size: 12px;
+}
+
+.board-refresh .ant-btn { flex-shrink: 0; }
+
 .board-welcome {
   display: grid;
   min-height: 260px;
@@ -365,6 +377,10 @@ input {
 .page-state, .simple-page { width: min(100% - 40px, 720px); margin: 80px auto; }
 .simple-page h1 { color: #2d3d33; }
 .project-list, .project-form { display: grid; gap: 10px; margin-top: 28px; }
+.project-nav { display: flex; gap: 8px; margin-top: 24px; padding-bottom: 10px; border-bottom: 1px solid #e1e7e1; }
+.project-nav a { padding: 8px 12px; border-radius: 8px; color: #526859; text-decoration: none; }
+.project-nav a:hover, .project-nav__active { background: #e8eee7; color: #274c3c !important; }
+.project-list { margin-top: 20px; }
 .project-list h2, .project-form h2 { margin: 0 0 4px; color: #304136; font-size: 16px; }
 .project-list__item { display: flex; justify-content: space-between; padding: 14px 16px; border: 1px solid #e1e7e1; border-radius: 10px; color: #304136; text-decoration: none; }
 .project-list__item:hover { border-color: #9bad9d; background: #f8faf7; }
@@ -575,4 +591,6 @@ input {
   .kanban-result-count {
     text-align: right;
   }
+
+  .board-refresh { align-items: flex-start; }
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getWorkspace } from "./projectApi";
+import { getAllProjects, getCurrentUserIsSystemAdmin, getWorkspace } from "./projectApi";
 
 const mocks = vi.hoisted(() => ({
   from: vi.fn(),
@@ -9,9 +9,10 @@ const mocks = vi.hoisted(() => ({
   projectSelect: vi.fn(),
   projectIn: vi.fn(),
   projectOrder: vi.fn(),
+  rpc: vi.fn(),
 }));
 vi.mock("../../../lib/supabase", () => ({
-  supabase: { from: mocks.from, auth: { getUser: mocks.getUser } },
+  supabase: { from: mocks.from, rpc: mocks.rpc, auth: { getUser: mocks.getUser } },
 }));
 
 describe("My Projects", () => {
@@ -58,5 +59,32 @@ describe("My Projects", () => {
     mocks.membershipEq.mockResolvedValue({ data: [], error: null });
     expect(await getWorkspace()).toEqual({ projects: [] });
     expect(mocks.from).not.toHaveBeenCalledWith("projects");
+  });
+});
+
+describe("administrator project access", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.from.mockReturnValue({ select: mocks.projectSelect });
+    mocks.projectSelect.mockReturnValue({ order: mocks.projectOrder });
+  });
+
+  it("returns only the caller's admin status", async () => {
+    mocks.rpc.mockResolvedValue({ data: true, error: null });
+    expect(await getCurrentUserIsSystemAdmin()).toBe(true);
+    expect(mocks.rpc).toHaveBeenCalledWith("current_user_is_system_admin");
+  });
+
+  it("does not query all projects for a non-admin", async () => {
+    mocks.rpc.mockResolvedValue({ data: false, error: null });
+    await expect(getAllProjects()).rejects.toThrow("只有系统管理员");
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
+  it("lists all RLS-visible projects for an administrator", async () => {
+    mocks.rpc.mockResolvedValue({ data: true, error: null });
+    mocks.projectOrder.mockResolvedValue({ data: [{ id: "other", name: "其他项目" }], error: null });
+    expect(await getAllProjects()).toEqual([{ id: "other", name: "其他项目" }]);
+    expect(mocks.from).toHaveBeenCalledWith("projects");
   });
 });

@@ -9,9 +9,10 @@ type TaskCardProps = {
   onDelete: (taskId: string) => void;
   onOpenDetails: (taskId: string) => void;
   isThisTaskPending: boolean;
+  canDelete: boolean;
 };
 
-export function TaskCard({ task, onComplete, onStatusChange, onEdit, onDelete, onOpenDetails, isThisTaskPending }: TaskCardProps) {
+export function TaskCard({ task, onComplete, onStatusChange, onEdit, onDelete, onOpenDetails, isThisTaskPending, canDelete }: TaskCardProps) {
   const priorityLabels = { low: "低", medium: "中", high: "高" };
   return <article className="task-card">
     <h3 className="task-card__title">{task.title}</h3>
@@ -25,9 +26,9 @@ export function TaskCard({ task, onComplete, onStatusChange, onEdit, onDelete, o
         {task.status !== "done" && <Button size="small" type="primary" loading={isThisTaskPending} onClick={() => onComplete(task.id)}>完成</Button>}
         <Button size="small" onClick={() => onOpenDetails(task.id)}>评论</Button>
         <Button size="small" onClick={() => onEdit(task)}>编辑</Button>
-        <Popconfirm title="删除这条任务？" description="相关评论也会一并删除。" okText="删除" cancelText="取消" onConfirm={() => onDelete(task.id)}>
-          <Button size="small" danger>删除</Button>
-        </Popconfirm>
+        {canDelete && <Popconfirm title="删除这条任务？" description="相关评论也会一并删除。" okText="删除" cancelText="取消" onConfirm={() => onDelete(task.id)}>
+          <Button size="small" danger loading={isThisTaskPending}>删除</Button>
+        </Popconfirm>}
       </div>
     </div>
   </article>;

@@ -14,6 +14,9 @@ import {
 } from "../features/tasks/api/taskApi";
 import {
   createProject,
+  getAllProjects,
+  getCurrentProjectRole,
+  getCurrentUserIsSystemAdmin,
   getProjectById,
   getProjectMembers,
   getWorkspace,
@@ -40,15 +43,28 @@ function BoardPage() {
     queryFn: () => getProjectById(projectId!),
     enabled: Boolean(supabase && userId && projectId),
   });
+  const adminQuery = useQuery({
+    queryKey: ["currentUserIsSystemAdmin", userId],
+    queryFn: getCurrentUserIsSystemAdmin,
+    enabled: Boolean(supabase && userId),
+  });
+  const roleQuery = useQuery({
+    queryKey: ["projectRole", userId, projectId],
+    queryFn: () => getCurrentProjectRole(projectId!, userId!),
+    enabled: Boolean(supabase && userId && projectId),
+  });
   const {
     data: tasks = [],
     isPending,
     isError,
+    isFetching,
     error,
   } = useQuery({
     queryKey: ["tasks", userId, projectId],
     queryFn: () => getTasks(projectId!),
     enabled: Boolean(supabase && userId && projectId),
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: "always",
   });
   const membersQuery = useQuery({
     queryKey: ["projectMembers", userId, projectId],
@@ -59,11 +75,27 @@ function BoardPage() {
   const search = useTaskUiStore((state) => state.search);
   const statusFilter = useTaskUiStore((state) => state.statusFilter);
   const openTask = useTaskUiStore((state) => state.openTask);
+  const selectedTaskId = useTaskUiStore((state) => state.selectedTaskId);
+  const closeTask = useTaskUiStore((state) => state.closeTask);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [actionError, setActionError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
   const refreshTasks = () =>
-    queryClient.invalidateQueries({ queryKey: ["tasks", userId, projectId] });
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+  const manuallyRefreshTasks = async () => {
+    setActionNotice("");
+    setActionError("");
+    try {
+      await queryClient.refetchQueries(
+        { queryKey: ["tasks"], type: "active" },
+        { throwOnError: true },
+      );
+      setActionNotice("任务和已打开的详情已更新。");
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "刷新失败，请重试。");
+    }
+  };
   const createMutation = useMutation({
     mutationFn: (title: string) => createTask(projectId!, title),
     onSuccess: async () => {
@@ -94,9 +126,15 @@ function BoardPage() {
     mutationFn: (id: string) => deleteTask(projectId!, id),
     onSuccess: async () => {
       setActionError("");
+      setActionNotice("任务已删除。");
+      if (selectedTaskId === deleteMutation.variables) closeTask();
       await refreshTasks();
     },
-    onError: (e) => setActionError(e.message),
+    onError: async (e) => {
+      setActionNotice("");
+      setActionError(e.message);
+      await refreshTasks();
+    },
   });
 
   if (!supabase)
@@ -130,7 +168,7 @@ function BoardPage() {
     );
 
   if (isPending) return <main className="page-state">正在加载任务……</main>;
-  if (isError)
+  if (isError && tasks.length === 0)
     return (
       <main className="page-state">
         <Alert
@@ -168,6 +206,10 @@ function BoardPage() {
   const isPendingTask = (id: string) =>
     (updateMutation.isPending && updateMutation.variables.id === id) ||
     (deleteMutation.isPending && deleteMutation.variables === id);
+  const canDeleteTask = (task: Task) =>
+    adminQuery.data === true ||
+    roleQuery.data === "owner" ||
+    (roleQuery.data === "member" && task.createdBy === userId);
 
   return (
     <main className="kanban-page">
@@ -221,11 +263,34 @@ function BoardPage() {
           type="error"
           showIcon
           closable
-          message="操作未完成"
+          title="操作未完成"
           description={actionError}
           onClose={() => setActionError("")}
         />
       )}
+      {actionNotice && (
+        <Alert className="board-alert" type="success" showIcon closable
+          title={actionNotice} onClose={() => setActionNotice("")} />
+      )}
+      {(adminQuery.isError || roleQuery.isError) && (
+        <Alert className="board-alert" type="error" showIcon
+          title="删除权限加载失败"
+          description={adminQuery.error?.message ?? roleQuery.error?.message}
+          action={<Button onClick={() => {
+            void adminQuery.refetch();
+            void roleQuery.refetch();
+          }}>重试</Button>} />
+      )}
+      {isError && (
+        <Alert className="board-alert" type="error" showIcon
+          title="任务刷新失败，当前显示的是上次结果"
+          description={error.message}
+          action={<Button onClick={() => void manuallyRefreshTasks()}>重试</Button>} />
+      )}
+      <div className="board-refresh">
+        <span>页面可见时约每 10 秒更新；切回页面也会刷新。</span>
+        <Button onClick={() => void manuallyRefreshTasks()} loading={isFetching}>刷新任务</Button>
+      </div>
       <TaskToolbar visibleTasksLength={visibleTasks.length} />
       {tasks.length === 0 ? (
         <section className="board-welcome">
@@ -262,6 +327,7 @@ function BoardPage() {
                   }
                   onEdit={setEditingTask}
                   onDelete={(id) => deleteMutation.mutate(id)}
+                  canDelete={canDeleteTask(task)}
                   onOpenDetails={openTask}
                   isThisTaskPending={isPendingTask(task.id)}
                 />
@@ -346,19 +412,29 @@ function BoardPage() {
   );
 }
 
-function ProjectsPage() {
+function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
   const session = useAuthSession();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
   const [projectName, setProjectName] = useState("");
+  const adminQuery = useQuery({
+    queryKey: ["currentUserIsSystemAdmin", userId],
+    queryFn: getCurrentUserIsSystemAdmin,
+    enabled: Boolean(supabase && userId),
+  });
   const workspaceQuery = useQuery({
     queryKey: ["workspace", "projects", userId],
     queryFn: getWorkspace,
-    enabled: Boolean(supabase && userId),
+    enabled: Boolean(supabase && userId && !showAll),
+  });
+  const allProjectsQuery = useQuery({
+    queryKey: ["workspace", "allProjects", userId],
+    queryFn: getAllProjects,
+    enabled: Boolean(supabase && userId && showAll && adminQuery.data === true),
   });
   const refreshWorkspace = () =>
     queryClient.invalidateQueries({
-      queryKey: ["workspace", "projects", userId],
+      queryKey: ["workspace"],
     });
   const createProjectMutation = useMutation({
     mutationFn: createProject,
@@ -366,7 +442,6 @@ function ProjectsPage() {
       setProjectName("");
       await refreshWorkspace();
     },
-    onSettled: refreshWorkspace,
   });
 
   if (!supabase)
@@ -385,21 +460,44 @@ function ProjectsPage() {
     );
 
   const operationError = createProjectMutation.error?.message;
+  const projects = showAll ? allProjectsQuery.data : workspaceQuery.data?.projects;
+  const listPending = showAll ? allProjectsQuery.isPending : workspaceQuery.isPending;
+  const listError = showAll ? allProjectsQuery.error : workspaceQuery.error;
+  const retryList = showAll ? allProjectsQuery.refetch : workspaceQuery.refetch;
+
+  if (showAll && adminQuery.data === false) return <Navigate to="/projects" replace />;
 
   return (
     <main className="simple-page">
       <p className="eyebrow">PROJECT TASKS</p>
-      <h1>项目</h1>
+      <h1>{showAll ? "全部项目" : "我的项目"}</h1>
       <Link to="/settings">设置我的显示名称 →</Link>
-      {workspaceQuery.isPending && <p>正在加载项目……</p>}
-      {workspaceQuery.isError && (
+      <nav className="project-nav" aria-label="项目列表范围">
+        <Link className={!showAll ? "project-nav__active" : ""} to="/projects">
+          我的项目
+        </Link>
+        {adminQuery.data === true && (
+          <Link className={showAll ? "project-nav__active" : ""} to="/projects/all">
+            全部项目
+          </Link>
+        )}
+      </nav>
+      {adminQuery.isError && (
+        <Alert type="error" showIcon title="管理员身份加载失败"
+          description={adminQuery.error.message}
+          action={<Button onClick={() => void adminQuery.refetch()}>重试</Button>} />
+      )}
+      {((showAll && adminQuery.isPending) ||
+        (listPending && (!showAll || adminQuery.data === true))) &&
+        <p>正在加载项目……</p>}
+      {listError && (
         <Alert
           type="error"
           showIcon
           message="项目加载失败"
-          description={workspaceQuery.error.message}
+          description={listError.message}
           action={
-            <Button onClick={() => void workspaceQuery.refetch()}>重试</Button>
+            <Button onClick={() => void retryList()}>重试</Button>
           }
         />
       )}
@@ -413,31 +511,31 @@ function ProjectsPage() {
           description={operationError}
         />
       )}
-      {workspaceQuery.data && (
+      {projects && (
         <>
           <section
             className="project-list"
             aria-labelledby="project-list-title"
           >
-            <h2 id="project-list-title">我的项目</h2>
-            {workspaceQuery.data.projects.length === 0 ? (
-              <p>还没有创建或加入的项目。可新建项目，或向项目组长获取邀请链接。</p>
+            <h2 id="project-list-title">{showAll ? "全部项目" : "我的项目"}</h2>
+            {projects.length === 0 ? (
+              <p>{showAll ? "目前没有项目。" : "还没有创建或加入的项目。可新建项目，或向项目组长获取邀请链接。"}</p>
             ) : (
-              workspaceQuery.data.projects.map((project) => (
+              projects.map((project) => (
                 <Link
                   className="project-list__item"
                   key={project.id}
                   to={`/projects/${project.id}/board`}
                 >
                   <span>
-                    {project.name}{project.role === "owner" ? " (owner)" : ""}
+                    {project.name}{"role" in project && project.role === "owner" ? " (owner)" : ""}
                   </span>
                   <span aria-hidden="true">→</span>
                 </Link>
               ))
             )}
           </section>
-          <form
+          {!showAll && <form
             className="project-form"
             onSubmit={(event) => {
               event.preventDefault();
@@ -462,7 +560,7 @@ function ProjectsPage() {
             >
               创建项目
             </Button>
-          </form>
+          </form>}
         </>
       )}
     </main>
@@ -557,6 +655,7 @@ function App() {
     <Routes>
       <Route path="/invite" element={<ProjectInvitationPage />} />
       <Route path="/projects" element={<ProjectsPage />} />
+      <Route path="/projects/all" element={<ProjectsPage showAll />} />
       <Route path="/projects/:projectId/board" element={<BoardPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/" element={<Navigate to="/projects" replace />} />

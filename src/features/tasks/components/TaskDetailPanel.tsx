@@ -25,6 +25,8 @@ export function TaskDetailPanel({ projectId, userId }: { projectId: string; user
       return task;
     },
     enabled: selectedTaskId !== null,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: "always",
   });
 
   const commentsQuery = useQuery({
@@ -34,6 +36,8 @@ export function TaskDetailPanel({ projectId, userId }: { projectId: string; user
         ? Promise.resolve([])
         : getTaskComments(selectedTaskId),
     enabled: selectedTaskId !== null,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: "always",
   });
 
   const addCommentMutation = useMutation({
@@ -59,7 +63,7 @@ export function TaskDetailPanel({ projectId, userId }: { projectId: string; user
         <div className="task-detail-panel">
           {taskQuery.isPending && <Spin tip="正在加载任务详情……" />}
           {taskQuery.isError && (
-            <Alert type="error" title={taskQuery.error.message} showIcon />
+            <Alert type="error" title="任务详情更新失败" description={taskQuery.error.message} showIcon action={<Button onClick={() => void taskQuery.refetch()}>重试</Button>} />
           )}
           {taskQuery.data && (
             <section className="task-detail-summary" aria-label="任务信息">
@@ -99,8 +103,10 @@ export function TaskDetailPanel({ projectId, userId }: { projectId: string; user
             {commentsQuery.isError && (
               <Alert
                 type="error"
-                title={commentsQuery.error.message}
+                title="评论更新失败"
+                description={commentsQuery.error.message}
                 showIcon
+                action={<Button onClick={() => void commentsQuery.refetch()}>重试</Button>}
               />
             )}
             {commentsQuery.data?.length === 0 && (
