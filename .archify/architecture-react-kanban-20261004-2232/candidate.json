@@ -1,0 +1,331 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "React Kanban：服务端架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/architecture-react-kanban-20261004-2232/react-kanban-architecture.html",
+    "repository": {
+      "url": "git@github.com:fartmonarch/tasks-board.git",
+      "link_mode": "local-only",
+      "revision": "f2276e770521ecf3644aba12c8bd6e7f2b5683d2"
+    }
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "项目成员",
+      "sublabel": "浏览器用户",
+      "pos": [
+        40,
+        330
+      ],
+      "size": [
+        130,
+        76
+      ],
+      "icon": "person"
+    },
+    {
+      "id": "web_app",
+      "type": "frontend",
+      "label": "React Kanban",
+      "sublabel": "React SPA · TanStack Query",
+      "pos": [
+        260,
+        325
+      ],
+      "size": [
+        190,
+        86
+      ],
+      "sources": [
+        {
+          "path": "src/main.tsx",
+          "line": 1,
+          "end_line": 16,
+          "label": "应用入口"
+        },
+        {
+          "path": "src/features/auth/AuthGate.tsx",
+          "line": 9,
+          "end_line": 35,
+          "label": "会话门禁"
+        },
+        {
+          "path": "src/lib/supabase.ts",
+          "line": 1,
+          "end_line": 12,
+          "label": "SDK 客户端"
+        }
+      ]
+    },
+    {
+      "id": "supabase_auth",
+      "type": "security",
+      "label": "Supabase Auth",
+      "sublabel": "身份验证 · JWT session",
+      "pos": [
+        260,
+        120
+      ],
+      "size": [
+        190,
+        82
+      ],
+      "sources": [
+        {
+          "path": "src/features/auth/AuthPage.tsx",
+          "line": 16,
+          "end_line": 35,
+          "label": "注册与登录"
+        },
+        {
+          "path": "src/features/auth/AuthGate.tsx",
+          "line": 13,
+          "end_line": 34,
+          "label": "恢复和监听会话"
+        },
+        {
+          "path": "src/lib/supabase.ts",
+          "line": 3,
+          "end_line": 9,
+          "label": "持久化与令牌刷新"
+        }
+      ]
+    },
+    {
+      "id": "data_api",
+      "type": "backend",
+      "label": "Supabase Data API",
+      "sublabel": "supabase-js · 表查询 / RPC",
+      "pos": [
+        550,
+        325
+      ],
+      "size": [
+        210,
+        86
+      ],
+      "sources": [
+        {
+          "path": "src/features/projects/api/projectApi.ts",
+          "line": 27,
+          "end_line": 50,
+          "label": "项目查询"
+        },
+        {
+          "path": "src/features/projects/api/projectInvitationApi.ts",
+          "line": 26,
+          "end_line": 63,
+          "label": "邀请 RPC"
+        },
+        {
+          "path": "src/features/tasks/api/taskApi.ts",
+          "line": 61,
+          "end_line": 93,
+          "label": "任务读写"
+        }
+      ]
+    },
+    {
+      "id": "postgres_authz",
+      "type": "security",
+      "label": "数据库授权与函数",
+      "sublabel": "PostgreSQL 内 · GRANT / RLS / RPC",
+      "pos": [
+        910,
+        325
+      ],
+      "size": [
+        210,
+        96
+      ],
+      "sources": [
+        {
+          "path": "supabase/migrations/20261003160939_invite_only_project_membership.sql",
+          "line": 20,
+          "end_line": 32,
+          "label": "关闭公开读取与直接加入"
+        },
+        {
+          "path": "supabase/migrations/20261003151530_project_roles_and_task_delete_permissions.sql",
+          "line": 159,
+          "end_line": 169,
+          "label": "角色化删除策略"
+        },
+        {
+          "path": "supabase/migrations/20261004084548_persist_task_sort_order.sql",
+          "line": 24,
+          "end_line": 32,
+          "label": "Invoker 排序 RPC"
+        }
+      ]
+    },
+    {
+      "id": "business_db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "业务数据 · 约束 · 事务持久化",
+      "pos": [
+        1260,
+        325
+      ],
+      "size": [
+        210,
+        86
+      ],
+      "sources": [
+        {
+          "path": "supabase/migrations/20260930093203_create_core_team_project_task_schema.sql",
+          "line": 8,
+          "end_line": 70,
+          "label": "表结构与关系"
+        },
+        {
+          "path": "supabase/migrations/20261003151530_project_roles_and_task_delete_permissions.sql",
+          "line": 4,
+          "end_line": 42,
+          "label": "项目角色与管理员表"
+        },
+        {
+          "path": "supabase/migrations/20261004084548_persist_task_sort_order.sql",
+          "line": 3,
+          "end_line": 22,
+          "label": "持久化任务顺序"
+        }
+      ]
+    },
+    {
+      "id": "private_invites",
+      "type": "database",
+      "label": "邀请凭证表",
+      "sublabel": "private.project_invitations · 仅存哈希",
+      "tag": "客户端无直接权限",
+      "pos": [
+        1260,
+        510
+      ],
+      "size": [
+        230,
+        88
+      ],
+      "sources": [
+        {
+          "path": "supabase/migrations/20261003160939_invite_only_project_membership.sql",
+          "line": 3,
+          "end_line": 18,
+          "label": "私有表和直接权限撤销"
+        },
+        {
+          "path": "supabase/migrations/20261003160939_invite_only_project_membership.sql",
+          "line": 98,
+          "end_line": 150,
+          "label": "哈希兑换事务"
+        },
+        {
+          "path": "supabase/migrations/20261003163828_support_project_invitation_modes.sql",
+          "line": 1,
+          "end_line": 18,
+          "label": "单人 / 多人有效期约束"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Supabase 托管服务",
+      "wraps": [
+        "supabase_auth",
+        "data_api",
+        "postgres_authz",
+        "business_db",
+        "private_invites"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "private schema · 不向浏览器开放",
+      "wraps": [
+        "private_invites"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-to-app",
+      "from": "user",
+      "to": "web_app",
+      "label": "访问看板与邀请页",
+      "variant": "emphasis"
+    },
+    {
+      "id": "app-to-auth",
+      "from": "web_app",
+      "to": "supabase_auth",
+      "label": "注册 / 密码登录",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "auth-session",
+      "from": "supabase_auth",
+      "to": "web_app",
+      "label": "恢复会话 · JWT",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "app-to-data-api",
+      "from": "web_app",
+      "to": "data_api",
+      "label": ".from() / .rpc()",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-policies",
+      "from": "data_api",
+      "to": "postgres_authz",
+      "label": "携带用户会话 · 查询 / RPC"
+    },
+    {
+      "id": "policies-to-data",
+      "from": "postgres_authz",
+      "to": "business_db",
+      "label": "RLS 放行后读取 / 写入",
+      "variant": "security"
+    },
+    {
+      "id": "db-to-private-invites",
+      "from": "business_db",
+      "to": "private_invites",
+      "label": "数据库函数读写 · token hash",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "服务端能力落点",
+      "items": [
+        "浏览器通过 supabase-js 直接调用 Supabase；应用业务 API 在此终止，没有独立的 Express 服务层。",
+        "PostgreSQL 承担数据持久化、事务、SQL RPC、GRANT 与 RLS；按钮显隐不负责授权。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "适合继续深入的两处",
+      "items": [
+        "邀请兑换：数据库事务校验有效期与消费状态，私有表只存哈希，客户端不能直接读表。",
+        "任务排序：SECURITY INVOKER RPC 批量更新顺序，继续受任务表现有 RLS 约束。"
+      ]
+    }
+  ]
+}

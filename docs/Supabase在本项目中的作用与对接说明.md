@@ -1,6 +1,6 @@
 # Supabase 在本项目中的作用与对接说明
 
-> 更新日期：2026-10-02。本文对应当前线上版本。前端地址：[tasks-board-swart.vercel.app](https://tasks-board-swart.vercel.app)。
+> 更新日期：2026-10-04。本文说明本项目当前的 Supabase 接入方式。前端地址：[tasks-board-swart.vercel.app](https://tasks-board-swart.vercel.app)。当前权限规则、邀请流程及任务排序以已应用的 migrations 为准；仓库当前工作区的 UI 和页面拆分改动仍待维护者发布。
 
 ## 1. 先用一句话理解
 
@@ -56,8 +56,8 @@ Supabase Auth 使用 JWT；SDK 发起数据请求时会附带当前用户会话�
 | --- | --- | --- |
 | `profiles` | 用户显示名称 | `id` 对应 Supabase Auth 用户 ID；个人资料行由应用在读取资料时补齐，不是数据库自动生成的个人资料表。 |
 | `projects` | 项目名称和创建者 | 项目名按忽略大小写、去掉首尾空格后的值全局唯一。 |
-| `project_members` | 哪些用户加入了哪个项目 | `(project_id, user_id)` 唯一；创建者建项目时会同时成为成员。 |
-| `tasks` | 标题、状态、优先级、负责人、创建者 | 任务归属项目；负责人必须是同一项目的成员。 |
+| `project_members` | 哪些用户加入了哪个项目，以及 `owner/member` 角色 | `(project_id, user_id)` 唯一；创建者建项目时会同时成为 owner。 |
+| `tasks` | 标题、状态、优先级、排序、负责人、创建者 | 任务归属项目；负责人必须是同一项目的成员；排序通过项目内顺序 RPC 保存。 |
 | `comments` | 评论内容、任务、作者和时间 | 评论归属任务；删除任务时由外键级联删除评论。 |
 
 仓库的 `supabase/migrations/` 保存 SQL 变更历史。最初迁移曾包含团队表；后续迁移将现有数据迁移到直接项目成员模型并删除团队表。历史迁移按时间顺序保留，最终数据库状态才是当前模型。
@@ -66,22 +66,24 @@ Supabase Auth 使用 JWT；SDK 发起数据请求时会附带当前用户会话�
 
 RLS（Row Level Security，行级安全）是我们编写在 PostgreSQL 上的规则。Supabase 会在 Data API 请求到数据库时自动执行它们，但不会替我们决定规则内容。
 
-当前边界概括如下：
+当前边界概括如下（本地和远程迁移版本已对齐，共 17 条）：
 
 - 未登录用户不能读写业务表。
-- 登录用户可以浏览项目 ID/名称并自行加入项目；加入时 RLS 强制只能写入自己的用户 ID。
-- 登录用户只能读取已加入项目的任务、评论和该项目成员资料。
-- 项目创建者可通过数据库授权规则改名或删除自己的项目；当前页面不一定提供每一项管理操作。
+- 普通登录用户只能读取本人已关联的项目；管理员可按管理权限读取其他项目。
+- 普通用户不能公开发现或自行加入项目；owner/admin 生成限时邀请，接受后由数据库事务加入为 member。
+- 项目成员读取和协作维护本项目任务、评论；任务删除受创建者、owner 或系统管理员角色限制。
+- 项目 owner 可管理成员及项目生命周期；已归档项目只读。
 - `GRANT` 决定角色能否访问表/列；RLS 决定它能访问哪些行，两者都要正确。
 
-要注意：当前选择的是开放项目发现和自行加入。新注册用户也能看到项目名并自行加入。如果将来改成邀请或审批，需要一并调整 UI、RLS 和加入流程。
+项目隔离由数据库 `GRANT`/RLS 和邀请兑换 RPC 一起保证；隐藏前端入口本身不构成数据保护。
 
 ### 数据库函数与应用逻辑
 
-- `create_project(text)` 是我们手动编写的 Postgres RPC：检查存在已登录用户，在一个数据库事务中创建项目并添加创建者为成员。它是 `SECURITY INVOKER`，因此调用者仍受 `GRANT` 和 RLS 约束。
-- 加入项目不再依赖加入 RPC；前端插入自己的 `project_members` 行，由数据库 RLS 限制目标用户只能是当前用户。
+- `create_project(text)` 是手写的 Postgres RPC：在一个数据库事务中创建项目并建立 owner 关系。它是 `SECURITY INVOKER`，调用者仍受 `GRANT` 和 RLS 约束。
+- 邀请兑换 RPC 在数据库事务中校验凭证并加入 member；邀请码仅以哈希形式保存于不可由浏览器直接访问的私有表。
+- `reorder_project_tasks` 以 invoker 身份批量保存项目内任务状态和顺序，沿用现有角色与 RLS；归档项目拒绝写入。
 - `src/features/auth/profileApi.ts` 在应用读取资料时按需补齐个人显示名称。Supabase 不会自动把注册表单里的名字同步到 `profiles`；注册名字先作为 Auth 用户 metadata 传入，然后本项目代码再写入资料表。
-- TanStack Query 的查询、Mutation、缓存键及写入后刷新由本项目代码实现。项目没有订阅 Supabase Realtime；多个用户同时在线时，另一用户的更新要等页面重新请求/刷新后才能看到。
+- TanStack Query 的查询、Mutation、缓存键及写入后刷新由本项目代码实现。项目没有订阅 Supabase Realtime；看板通过可见页面轮询、切回页面刷新和手动刷新读取协作者更新。
 
 ## 5. 环境与 Supabase 项目如何连起来
 

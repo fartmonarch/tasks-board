@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "54e50e87-df24-4781-bec3-a99921dcd217",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Code\\project\\react-kanban\\.archify\\architecture-react-kanban-20261004-2232\\candidate.json",
+  "output": "D:\\Code\\project\\react-kanban\\.archify\\architecture-react-kanban-20261004-2232\\react-kanban-architecture.html",
+  "specification": {
+    "sha256": "011830d1c6a9441c7664f148f09050682f6b8b161166c0fb52c91ae3fd99051a",
+    "bytes": 8484
+  },
+  "artifact": {
+    "sha256": "4c31525e22dc6c8028a9f0eb2dab1eb609743752c80ae9b4decf12385397db28",
+    "bytes": 762463
+  }
+}

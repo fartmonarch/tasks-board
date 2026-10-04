@@ -1,17 +1,23 @@
 # React Kanban
 
-一个基于 React、TypeScript 和 Supabase 的轻量级项目任务协作看板。用户可以创建或加入项目，在看板中管理任务状态、优先级、负责人和评论。
+一个基于 React、TypeScript 和 Supabase 的轻量级项目任务协作看板。用户可以创建项目，或通过邀请加入项目，再在看板中管理任务状态、优先级、负责人和评论。
 
 ## 在线体验
 
 [打开任务协作看板](https://tasks-board-swart.vercel.app)
 
-前端部署在 Vercel，认证和业务数据由 Supabase 提供。新用户可以通过邮箱注册；如果需要邮箱验证，请先完成邮件验证再登录。登录用户可以创建项目、浏览项目名称并选择加入；任务和评论仅对项目成员开放。
+前端部署在 Vercel，认证和业务数据由 Supabase 提供。新用户可以通过邮箱注册；如果需要邮箱验证，请先完成邮件验证再登录。登录用户可以创建项目、查看自己创建或加入的项目；新成员通过项目邀请加入。任务和评论仅对项目成员开放。
+
+## 系统架构
+
+![React Kanban 项目架构图](docs/project-architecture.png)
+
+[交互式架构图 HTML 文件](docs/项目架构图.html)（下载后在浏览器中打开）。
 
 ## 功能
 
 - 邮箱注册、登录和退出登录
-- 创建项目、查看已加入项目，并浏览和加入其他项目
+- 创建项目、查看本人项目，并通过邀请加入其他项目
 - 按待处理、进行中、已完成三个状态组织任务
 - 创建、编辑、删除任务，调整状态和优先级
 - 将项目成员设为任务负责人
@@ -29,7 +35,7 @@
 | 路由与组件 | React Router 7、Ant Design 6、Ant Design Icons 6 |
 | 状态与数据请求 | Zustand 5、TanStack Query 5 |
 | 后端服务 | Supabase Auth、Postgres、Supabase JavaScript Client |
-| 质量工具 | ESLint 10、Vitest 5、Testing Library |
+| 质量工具 | ESLint 10 |
 
 ## 环境要求
 
@@ -92,7 +98,6 @@ npm run dev       # 启动本地开发服务器
 npm run build     # TypeScript 检查并构建生产版本
 npm run preview   # 本地预览生产构建
 npm run lint      # 运行 ESLint
-npm run test      # 运行 Vitest 测试
 ```
 
 ## 页面路由
@@ -100,7 +105,7 @@ npm run test      # 运行 Vitest 测试
 | 路径 | 说明 |
 | --- | --- |
 | `/invite` | 通过邀请链接加入项目 |
-| `/projects` | 项目列表、加入项目和创建项目 |
+| `/projects` | 本人项目列表和创建项目 |
 | `/projects/all` | 系统管理员查看全部项目 |
 | `/projects/:projectRef/board` | 指定项目的任务协作看板；UUID 会压缩为 22 位 Base64URL 字符串 |
 
@@ -110,13 +115,12 @@ npm run test      # 运行 Vitest 测试
 
 ```text
 src/
-├── app/                  # 应用页面、路由页面和全局样式
+├── app/                  # 路由入口和全局样式
 ├── features/
 │   ├── auth/             # 登录、会话和个人资料
-│   ├── projects/         # 项目数据访问
-│   └── tasks/            # 任务组件、数据访问、UI 状态和筛选
+│   ├── projects/         # 项目页面、组件和数据访问
+│   └── tasks/            # 看板页面、任务组件、数据访问、UI 状态和筛选
 ├── lib/                  # Supabase 客户端
-└── test/                 # 测试初始化
 supabase/
 └── migrations/           # 数据库结构、访问策略和 RPC 迁移
 docs/                     # 权限说明、路线图和开发记录
@@ -134,6 +138,7 @@ TanStack Query 管理服务端项目、任务、详情和评论数据；Zustand 
 
 ## 相关文档
 
+- [项目架构图：服务端学习入口](docs/项目架构图.md)
 - [Supabase 在本项目中的作用与对接说明](docs/Supabase在本项目中的作用与对接说明.md)
 - [用户权限与数据访问](docs/用户权限与数据访问.md)
 - [项目完整路线图](docs/项目完整路线图.md)
@@ -142,4 +147,4 @@ TanStack Query 管理服务端项目、任务、详情和评论数据；Zustand 
 
 ## 当前范围
 
-项目聚焦于项目和任务协作的核心流程。邀请审批、通知、附件和实时推送暂不属于当前范围；后续计划请以路线图和待完善功能文档为准。
+项目聚焦于项目和任务协作的核心流程。邮件通知、附件、实时推送和审批式加入暂不属于当前范围；当前通过项目 owner/admin 发出的限时邀请链接加入。后续计划请以路线图和待完善功能文档为准。

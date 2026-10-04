@@ -1,0 +1,29 @@
+Repository identity (credential-free SSH origin): git@github.com:fartmonarch/tasks-board.git
+Pinned revision: f2276e770521ecf3644aba12c8bd6e7f2b5683d2
+Link mode: local-only (SSH origin)
+Sources in candidate are limited to files unchanged in the working tree and are verified against the pinned revision. Local modifications and new files were not used as source evidence.
+
+Worktree status at diagram authoring: M README.md
+ M "docs/Supabase\345\234\250\346\234\254\351\241\271\347\233\256\344\270\255\347\232\204\344\275\234\347\224\250\344\270\216\345\257\271\346\216\245\350\257\264\346\230\216.md"
+ M "docs/\345\276\205\345\256\214\345\226\204\345\212\237\350\203\275\344\270\216\345\274\200\345\217\221\351\241\272\345\272\217.md"
+ M "docs/\347\224\250\346\210\267\346\235\203\351\231\220\344\270\216\346\225\260\346\215\256\350\256\277\351\227\256.md"
+ M "docs/\351\230\266\346\256\265\350\277\233\345\272\246\351\200\237\346\237\245.md"
+ M "docs/\351\241\271\347\233\256\345\256\214\346\225\264\350\267\257\347\272\277\345\233\276.md"
+ M package-lock.json
+ M package.json
+ D src/app/App.test.tsx
+ M src/app/App.tsx
+ D src/features/auth/AuthGate.test.tsx
+ D src/features/projects/api/projectApi.test.ts
+ D src/features/projects/api/projectInvitationApi.test.ts
+ D src/features/projects/components/ProjectInviteButton.test.tsx
+ D src/features/projects/components/ProjectManagement.test.tsx
+ D src/features/projects/pages/ProjectInvitationPage.test.tsx
+ D src/features/tasks/api/taskApi.test.ts
+ D src/features/tasks/components/TaskCard.test.tsx
+ D src/features/tasks/utils/filterTasks.test.ts
+ D src/test/setup.ts
+ D vitest.config.ts
+?? .archify/
+?? src/features/projects/pages/ProjectsPage.tsx
+?? src/features/tasks/pages/
