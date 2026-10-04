@@ -41,15 +41,15 @@ describe("My Projects", () => {
     });
     mocks.projectOrder.mockResolvedValue({
       data: [
-        { id: "mine", name: "Created" },
-        { id: "joined", name: "Joined" },
+        { id: "mine", name: "Created", archived_at: null },
+        { id: "joined", name: "Joined", archived_at: "2026-10-04T00:00:00Z" },
       ],
       error: null,
     });
     expect(await getWorkspace()).toEqual({
       projects: [
-        { id: "mine", name: "Created", role: "owner" },
-        { id: "joined", name: "Joined", role: "member" },
+        { id: "mine", name: "Created", archivedAt: null, role: "owner" },
+        { id: "joined", name: "Joined", archivedAt: "2026-10-04T00:00:00Z", role: "member" },
       ],
     });
     expect(mocks.membershipEq).toHaveBeenCalledWith("user_id", "admin-id");
@@ -83,8 +83,8 @@ describe("administrator project access", () => {
 
   it("lists all RLS-visible projects for an administrator", async () => {
     mocks.rpc.mockResolvedValue({ data: true, error: null });
-    mocks.projectOrder.mockResolvedValue({ data: [{ id: "other", name: "其他项目" }], error: null });
-    expect(await getAllProjects()).toEqual([{ id: "other", name: "其他项目" }]);
+    mocks.projectOrder.mockResolvedValue({ data: [{ id: "other", name: "其他项目", archived_at: null }], error: null });
+    expect(await getAllProjects()).toEqual([{ id: "other", name: "其他项目", archivedAt: null }]);
     expect(mocks.from).toHaveBeenCalledWith("projects");
   });
 });

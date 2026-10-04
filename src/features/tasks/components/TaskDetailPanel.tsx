@@ -9,7 +9,7 @@ type AddCommentVariables = {
   content: string;
 };
 
-export function TaskDetailPanel({ projectId, userId }: { projectId: string; userId: string }) {
+export function TaskDetailPanel({ projectId, userId, readOnly = false }: { projectId: string; userId: string; readOnly?: boolean }) {
   const [commentContent, setCommentContent] = useState("");
   const selectedTaskId = useTaskUiStore((state) => state.selectedTaskId);
   const closeTask = useTaskUiStore((state) => state.closeTask);
@@ -122,7 +122,7 @@ export function TaskDetailPanel({ projectId, userId }: { projectId: string; user
             ))}
           </section>
 
-          <form
+          {!readOnly && <form
             className="task-comment-form"
             onSubmit={(event) => {
               event.preventDefault();
@@ -154,7 +154,7 @@ export function TaskDetailPanel({ projectId, userId }: { projectId: string; user
             >
               添加评论
             </Button>
-          </form>
+          </form>}
         </div>
       )}
     </Drawer>

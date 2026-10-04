@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
@@ -110,7 +110,7 @@ it("shows current owner role in My Projects and removes public discovery/join ac
     </QueryClientProvider>,
   );
   expect(
-    await screen.findByRole("link", { name: /组长项目 \(owner\)/ }),
+    await screen.findByRole("link", { name: /组长项目（组长）/ }),
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "成员项目" })).toBeInTheDocument();
   expect(screen.queryByText("可加入的项目")).not.toBeInTheDocument();
@@ -124,7 +124,7 @@ it("shows an administrator all projects while My Projects stays membership-scope
   workspace.mockResolvedValue({ projects: [{ id: "mine", name: "我的测试项目", role: "owner" }] });
   allProjects.mockResolvedValue([{ id: "mine", name: "我的测试项目" }, { id: "other", name: "其他项目" }]);
   renderRoute("/projects");
-  expect(await screen.findByRole("link", { name: /我的测试项目 \(owner\)/ })).toBeInTheDocument();
+  expect(await screen.findByRole("link", { name: /我的测试项目（组长）/ })).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "其他项目" })).not.toBeInTheDocument();
   await userEvent.click(await screen.findByRole("link", { name: "全部项目" }));
   expect(await screen.findByRole("link", { name: "其他项目" })).toBeInTheDocument();
@@ -147,8 +147,9 @@ it("lets a member delete only their own task and refresh the board manually", as
   ]);
   renderRoute("/projects/p1/board");
   expect(await screen.findByRole("heading", { name: "本人任务" })).toBeInTheDocument();
-  expect(await screen.findByRole("button", { name: /删\s*除/ })).toBeInTheDocument();
-  expect(screen.getAllByRole("button", { name: /删\s*除/ })).toHaveLength(1);
+  const board = screen.getByRole("region", { name: "任务看板" });
+  expect(await within(board).findByRole("button", { name: /删\s*除/ })).toBeInTheDocument();
+  expect(within(board).getAllByRole("button", { name: /删\s*除/ })).toHaveLength(1);
   await userEvent.click(screen.getByRole("button", { name: "刷新任务" }));
   expect(await screen.findByText("任务和已打开的详情已更新。" )).toBeInTheDocument();
   expect(tasks).toHaveBeenCalledTimes(2);
@@ -160,7 +161,7 @@ it("shows owner deletion for every task in the project", async () => {
   members.mockResolvedValue([]);
   tasks.mockResolvedValue([{ id: "other", title: "成员任务", status: "todo", priority: "low", assignee: "未分配", assigneeUserId: null, createdBy: "other-id" }]);
   renderRoute("/projects/p1/board");
-  expect(await screen.findByRole("button", { name: /删\s*除/ })).toBeInTheDocument();
+  expect(await within(await screen.findByRole("region", { name: "任务看板" })).findByRole("button", { name: /删\s*除/ })).toBeInTheDocument();
 });
 
 it("shows an unjoined administrator the deletion action on a linked board", async () => {
@@ -170,7 +171,7 @@ it("shows an unjoined administrator the deletion action on a linked board", asyn
   members.mockResolvedValue([]);
   tasks.mockResolvedValue([{ id: "other", title: "成员任务", status: "todo", priority: "low", assignee: "未分配", assigneeUserId: null, createdBy: "other-id" }]);
   renderRoute("/projects/p1/board");
-  expect(await screen.findByRole("button", { name: /删\s*除/ })).toBeInTheDocument();
+  expect(await within(await screen.findByRole("region", { name: "任务看板" })).findByRole("button", { name: /删\s*除/ })).toBeInTheDocument();
 });
 
 it("reports a refused deletion without showing success", async () => {
@@ -180,7 +181,7 @@ it("reports a refused deletion without showing success", async () => {
   members.mockResolvedValue([]);
   tasks.mockResolvedValue([{ id: "one", title: "待删除任务", status: "todo", priority: "low", assignee: "未分配", assigneeUserId: null, createdBy: "user-id" }]);
   renderRoute("/projects/p1/board");
-  await userEvent.click(await screen.findByRole("button", { name: /删\s*除/ }));
+  await userEvent.click(await within(await screen.findByRole("region", { name: "任务看板" })).findByRole("button", { name: /删\s*除/ }));
   const deleteButtons = screen.getAllByRole("button", { name: /删\s*除/ });
   await userEvent.click(deleteButtons[deleteButtons.length - 1]);
   expect(await screen.findByText("permission denied")).toBeInTheDocument();

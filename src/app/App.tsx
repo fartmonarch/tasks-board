@@ -22,6 +22,7 @@ import {
   getWorkspace,
 } from "../features/projects/api/projectApi";
 import { ProjectInviteButton } from "../features/projects/components/ProjectInviteButton";
+import { ProjectManagement } from "../features/projects/components/ProjectManagement";
 import { ProjectInvitationPage } from "../features/projects/pages/ProjectInvitationPage";
 import { useAuthSession } from "../features/auth/AuthSessionContext";
 import {
@@ -42,6 +43,8 @@ function BoardPage() {
     queryKey: ["project", userId, projectId],
     queryFn: () => getProjectById(projectId!),
     enabled: Boolean(supabase && userId && projectId),
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: "always",
   });
   const adminQuery = useQuery({
     queryKey: ["currentUserIsSystemAdmin", userId],
@@ -52,6 +55,8 @@ function BoardPage() {
     queryKey: ["projectRole", userId, projectId],
     queryFn: () => getCurrentProjectRole(projectId!, userId!),
     enabled: Boolean(supabase && userId && projectId),
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: "always",
   });
   const {
     data: tasks = [],
@@ -70,6 +75,8 @@ function BoardPage() {
     queryKey: ["projectMembers", userId, projectId],
     queryFn: () => getProjectMembers(projectId!),
     enabled: Boolean(supabase && userId && projectId),
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: "always",
   });
   const queryClient = useQueryClient();
   const search = useTaskUiStore((state) => state.search);
@@ -207,9 +214,11 @@ function BoardPage() {
     (updateMutation.isPending && updateMutation.variables.id === id) ||
     (deleteMutation.isPending && deleteMutation.variables === id);
   const canDeleteTask = (task: Task) =>
-    adminQuery.data === true ||
-    roleQuery.data === "owner" ||
-    (roleQuery.data === "member" && task.createdBy === userId);
+    !projectQuery.data.archivedAt && (
+      adminQuery.data === true ||
+      roleQuery.data === "owner" ||
+      (roleQuery.data === "member" && task.createdBy === userId));
+  const isArchived = Boolean(projectQuery.data.archivedAt);
 
   return (
     <main className="kanban-page">
@@ -221,9 +230,9 @@ function BoardPage() {
           <p className="project-intro">
             把项目的下一步放在一起，清晰推进每一项工作。
           </p>
-          <ProjectInviteButton key={projectId} projectId={projectId} />
+          {!isArchived && <ProjectInviteButton key={projectId} projectId={projectId} />}
         </div>
-        <form
+        {!isArchived && <form
           className="task-create-form"
           onSubmit={(event) => {
             event.preventDefault();
@@ -255,8 +264,10 @@ function BoardPage() {
               创建任务
             </Button>
           </div>
-        </form>
+        </form>}
       </header>
+      {isArchived && <Alert className="board-alert" type="info" showIcon
+        title="项目已归档" description="任务和评论可查看，恢复项目后才能继续修改。" />}
       {actionError && (
         <Alert
           className="board-alert"
@@ -328,6 +339,7 @@ function BoardPage() {
                   onEdit={setEditingTask}
                   onDelete={(id) => deleteMutation.mutate(id)}
                   canDelete={canDeleteTask(task)}
+                  readOnly={isArchived}
                   onOpenDetails={openTask}
                   isThisTaskPending={isPendingTask(task.id)}
                 />
@@ -339,10 +351,15 @@ function BoardPage() {
           ))}
         </section>
       )}
-      <TaskDetailPanel projectId={projectId} userId={userId!} />
+      <TaskDetailPanel projectId={projectId} userId={userId!} readOnly={isArchived} />
+      <ProjectManagement project={projectQuery.data} members={membersQuery.data ?? []}
+        membersPending={membersQuery.isPending} membersError={membersQuery.error?.message}
+        onRetryMembers={() => void membersQuery.refetch()}
+        isOwner={roleQuery.data === "owner"} isAdmin={adminQuery.data === true}
+        currentUserId={userId!} />
       <Modal
         title="编辑任务"
-        open={editingTask !== null}
+        open={editingTask !== null && !isArchived}
         okText="保存修改"
         cancelText="取消"
         confirmLoading={updateMutation.isPending}
@@ -528,7 +545,8 @@ function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
                   to={`/projects/${project.id}/board`}
                 >
                   <span>
-                    {project.name}{"role" in project && project.role === "owner" ? " (owner)" : ""}
+                    {project.name}{"role" in project && project.role === "owner" ? "（组长）" : ""}
+                    {project.archivedAt ? " · 已归档" : ""}
                   </span>
                   <span aria-hidden="true">→</span>
                 </Link>
