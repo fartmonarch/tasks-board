@@ -114,6 +114,7 @@ export function TaskDetailPanel({ projectId, userId, readOnly = false }: { proje
             )}
             {commentsQuery.data?.map((comment) => (
               <article className="task-comment" key={comment.id}>
+                <strong className="task-comment__author">{comment.authorName}</strong>
                 <p>{comment.content}</p>
                 <time dateTime={comment.createdAt}>
                   {new Date(comment.createdAt).toLocaleString()}

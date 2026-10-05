@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -9,7 +10,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import type { DragEndEvent } from "@dnd-kit/core";
+import type { DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Alert, Button, Drawer, Input, Modal, Select, Tooltip } from "antd";
 import {
@@ -105,6 +106,9 @@ export function BoardPage({ projectId }: { projectId: string }) {
   const [projectManagementOpen, setProjectManagementOpen] = useState(false);
   const [manualRefreshPending, setManualRefreshPending] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
+  const [dragPreviewTasks, setDragPreviewTasks] = useState<Task[] | null>(null);
+  const dragPreviewRef = useRef<Task[] | null>(null);
   const [actionError, setActionError] = useState("");
   const [actionNotice, setActionNotice] = useState("");
   useEffect(() => {
@@ -242,6 +246,7 @@ export function BoardPage({ projectId }: { projectId: string }) {
       (b.sortOrder ?? Number.MAX_SAFE_INTEGER),
   );
   const visibleTasks = filterTasks(orderedTasks, search, statusFilter);
+  const displayedTasks = dragPreviewTasks ?? visibleTasks;
   const columns: Array<{
     status: Task["status"];
     title: string;
@@ -250,17 +255,17 @@ export function BoardPage({ projectId }: { projectId: string }) {
     {
       status: "todo",
       title: "待处理",
-      tasks: visibleTasks.filter((task) => task.status === "todo"),
+      tasks: displayedTasks.filter((task) => task.status === "todo"),
     },
     {
       status: "doing",
       title: "进行中",
-      tasks: visibleTasks.filter((task) => task.status === "doing"),
+      tasks: displayedTasks.filter((task) => task.status === "doing"),
     },
     {
       status: "done",
       title: "已完成",
-      tasks: visibleTasks.filter((task) => task.status === "done"),
+      tasks: displayedTasks.filter((task) => task.status === "done"),
     },
   ];
   const isPendingTask = (id: string) =>
@@ -272,58 +277,83 @@ export function BoardPage({ projectId }: { projectId: string }) {
       roleQuery.data === "owner" ||
       (roleQuery.data === "member" && task.createdBy === userId));
   const canReorder = !isArchived && !search.trim() && statusFilter === "all";
-  const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    if (!over || !canReorder || reorderMutation.isPending) return;
-    const activeTask = orderedTasks.find((task) => task.id === active.id);
-    if (!activeTask || String(over.id) === activeTask.id) return;
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveDragTaskId(String(active.id));
+    dragPreviewRef.current = orderedTasks;
+    setDragPreviewTasks(orderedTasks);
+  };
+  const handleDragOver = ({ active, over }: DragOverEvent) => {
+    const current = dragPreviewRef.current;
+    if (!current || !over || active.id === over.id) return;
+
     const statuses: Task["status"][] = ["todo", "doing", "done"];
-    const destination = statuses.includes(over.id as Task["status"])
+    const draggedTask = current.find((task) => task.id === active.id);
+    const overTask = current.find((task) => task.id === over.id);
+    const destination = overTask?.status ?? (statuses.includes(over.id as Task["status"])
       ? (over.id as Task["status"])
-      : orderedTasks.find((task) => task.id === over.id)?.status;
-    if (!destination) return;
-    const lists = Object.fromEntries(
-      statuses.map((status) => [
-        status,
-        orderedTasks.filter((task) => task.status === status),
-      ]),
-    ) as Record<Task["status"], Task[]>;
-    const sourceList = lists[activeTask.status];
-    const sourceIndex = sourceList.findIndex(
-      (task) => task.id === activeTask.id,
-    );
-    if (sourceIndex < 0) return;
-    if (activeTask.status === destination) {
-      const targetIndex =
-        over.id === destination
-          ? sourceList.length - 1
-          : sourceList.findIndex((task) => task.id === over.id);
-      if (targetIndex < 0 || targetIndex === sourceIndex) return;
-      lists[destination] = arrayMove(sourceList, sourceIndex, targetIndex);
-    } else {
-      lists[activeTask.status] = sourceList.filter(
-        (task) => task.id !== activeTask.id,
+      : undefined);
+    if (!draggedTask || !destination) return;
+
+    const sourceList = current.filter((task) => task.status === draggedTask.status);
+    const sourceIndex = sourceList.findIndex((task) => task.id === draggedTask.id);
+    const translatedRect = active.rect.current.translated;
+    const activeCenter = translatedRect
+      ? translatedRect.top + translatedRect.height / 2
+      : over.rect.top + over.rect.height / 2;
+    const insertAfter = activeCenter > over.rect.top + over.rect.height / 2;
+
+    if (draggedTask.status === destination) {
+      const targetIndex = overTask
+        ? sourceList.findIndex((task) => task.id === overTask.id) + (insertAfter ? 1 : 0)
+        : sourceList.length;
+      const adjustedIndex = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex;
+      if (adjustedIndex < 0 || adjustedIndex === sourceIndex) return;
+      const reordered = arrayMove(sourceList, sourceIndex, adjustedIndex);
+      const next = statuses.flatMap((status) =>
+        (status === destination ? reordered : current.filter((task) => task.status === status))
+          .map((task, sortOrder) => ({ ...task, sortOrder })),
       );
-      const destinationList = lists[destination];
-      const targetIndex =
-        over.id === destination
-          ? destinationList.length
-          : destinationList.findIndex((task) => task.id === over.id);
-      const insertAt = targetIndex < 0 ? destinationList.length : targetIndex;
-      const movedTask = { ...activeTask, status: destination };
-      lists[destination] = [
-        ...destinationList.slice(0, insertAt),
-        movedTask,
-        ...destinationList.slice(insertAt),
-      ];
+      dragPreviewRef.current = next;
+      setDragPreviewTasks(next);
+      return;
     }
-    const next = statuses.flatMap((status) =>
-      lists[status].map((task, sortOrder) => ({
-        ...task,
-        status,
-        sortOrder,
-      })),
+
+    const destinationList = current.filter((task) => task.status === destination);
+    const targetIndex = overTask
+      ? destinationList.findIndex((task) => task.id === overTask.id) + (insertAfter ? 1 : 0)
+      : destinationList.length;
+    const movedTask = { ...draggedTask, status: destination };
+    const nextDestination = [
+      ...destinationList.slice(0, targetIndex),
+      movedTask,
+      ...destinationList.slice(targetIndex),
+    ];
+    const next = statuses.flatMap((status) => {
+      const statusTasks = status === draggedTask.status
+        ? sourceList.filter((task) => task.id !== draggedTask.id)
+        : status === destination
+          ? nextDestination
+          : current.filter((task) => task.status === status);
+      return statusTasks.map((task, sortOrder) => ({ ...task, sortOrder }));
+    });
+    dragPreviewRef.current = next;
+    setDragPreviewTasks(next);
+  };
+  const handleDragEnd = ({ over }: DragEndEvent) => {
+    setActiveDragTaskId(null);
+    const next = dragPreviewRef.current;
+    dragPreviewRef.current = null;
+    setDragPreviewTasks(null);
+    if (!over || !canReorder || reorderMutation.isPending || !next) return;
+    const changed = next.some((task, index) =>
+      task.id !== orderedTasks[index]?.id || task.status !== orderedTasks[index]?.status,
     );
-    reorderMutation.mutate(next);
+    if (changed) reorderMutation.mutate(next);
+  };
+  const handleDragCancel = () => {
+    setActiveDragTaskId(null);
+    dragPreviewRef.current = null;
+    setDragPreviewTasks(null);
   };
 
   return (
@@ -491,7 +521,10 @@ export function BoardPage({ projectId }: { projectId: string }) {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
           <section className="kanban-board" aria-label="任务看板">
             {columns.map((column) => (
@@ -508,9 +541,6 @@ export function BoardPage({ projectId }: { projectId: string }) {
                     onComplete={(id) =>
                       updateMutation.mutate({ id, changes: { status: "done" } })
                     }
-                    onStatusChange={(id, status) =>
-                      updateMutation.mutate({ id, changes: { status } })
-                    }
                     onEdit={setEditingTask}
                     onDelete={(id) => deleteMutation.mutate(id)}
                     canDelete={canDeleteTask(task)}
@@ -523,6 +553,23 @@ export function BoardPage({ projectId }: { projectId: string }) {
               </TaskBoardColumn>
             ))}
           </section>
+          <DragOverlay>
+            {activeDragTaskId && (() => {
+              const task = orderedTasks.find((item) => item.id === activeDragTaskId);
+              if (!task) return null;
+              return (
+                <article className="task-card task-card--drag-overlay" aria-hidden="true">
+                  <h3 className="task-card__title">{task.title}</h3>
+                  <div className="task-card__meta">
+                    <span className={`task-card__priority task-card__priority--${task.priority}`}>
+                      {{ low: "低", medium: "中", high: "高" }[task.priority]}优先级
+                    </span>
+                    <span className="task-card__assignee">{task.assignee || "未分配"}</span>
+                  </div>
+                </article>
+              );
+            })()}
+          </DragOverlay>
         </DndContext>
       )}
       <TaskDetailPanel
@@ -576,6 +623,7 @@ export function BoardPage({ projectId }: { projectId: string }) {
               id: editingTask.id,
               changes: {
                 title: editingTask.title.trim(),
+                status: editingTask.status,
                 priority: editingTask.priority,
                 assigneeUserId: editingTask.assigneeUserId,
               },
@@ -593,6 +641,18 @@ export function BoardPage({ projectId }: { projectId: string }) {
                 onChange={(e) =>
                   setEditingTask({ ...editingTask, title: e.target.value })
                 }
+              />
+            </label>
+            <label>
+              状态
+              <Select
+                value={editingTask.status}
+                onChange={(status) => setEditingTask({ ...editingTask, status })}
+                options={[
+                  { label: "待处理", value: "todo" },
+                  { label: "进行中", value: "doing" },
+                  { label: "已完成", value: "done" },
+                ]}
               />
             </label>
             <label>

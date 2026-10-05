@@ -333,16 +333,6 @@ input {
   color: #57734f;
 }
 
-.task-card__status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.task-card__status .ant-select {
-  min-width: 108px;
-}
-
 .task-card__actions {
   display: flex;
   flex-wrap: wrap;
@@ -814,9 +804,6 @@ input {
   border-top: 1px solid #efede8;
 }
 
-.task-card__status-select.ant-select { width: 100%; min-width: 0; height: 30px; font-size: 11px; }
-.task-card__status-select .ant-select-selector { min-width: 0; border-color: #e4dfd7 !important; border-radius: 6px !important; background: #faf9f6 !important; }
-.task-card__status-select .ant-select-selection-item { overflow: hidden; text-overflow: ellipsis; }
 .task-card__actions { display: flex; flex: 0 0 auto; flex-wrap: nowrap; align-items: center; gap: 5px; padding: 0; }
 .task-card__action.ant-btn { display: inline-grid; flex: 0 0 29px; width: 29px; min-width: 29px; height: 29px; padding: 0; place-items: center; border-color: #e6e1d9; border-radius: 7px; background: #fffefa; color: #686159; box-shadow: none; }
 .task-card__action.ant-btn:hover { border-color: #cfad9b !important; background: #fbf4ef !important; color: #a65338 !important; }
@@ -1123,8 +1110,6 @@ body {
 .task-card__actions .ant-btn { height: 27px; padding-inline: 8px; border-radius: 5px; font-size: 11px; }
 .task-card__actions .ant-btn-primary { border-color: #bd6748; background: #bd6748; box-shadow: none; }
 .task-card__actions .ant-btn-primary:hover { border-color: #a95337 !important; background: #a95337 !important; }
-.task-card__status .ant-select { font-size: 11px; }
-.task-card__status .ant-select-selector { border-color: #e3dfd8 !important; border-radius: 5px !important; background: #fffefa !important; }
 .board-welcome { min-height: 230px; border-color: #e1dcd4; border-radius: 8px; background: #f3f1ec; }
 .board-welcome__mark { color: #b76547; }
 .board-welcome h2 { color: #39352f; font-size: 17px; font-weight: 550; }
@@ -1202,4 +1187,48 @@ body {
 @media (max-width: 560px) {
   .kanban-create-button.ant-btn { width: 40px; min-width: 40px; height: 40px; padding: 0; font-size: 0; }
   .kanban-create-button.ant-btn .anticon { margin-inline-end: 0; font-size: 14px; }
+}
+
+.task-card__status-label {
+  justify-self: start;
+  padding: 5px 8px;
+  border: 1px solid #e8e5dc;
+  border-radius: 6px;
+  background: #f6f5f0;
+  color: #6e6b62;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.task-card__status-label--doing { border-color: #e5dcc3; background: #f7f3e8; color: #806b3d; }
+.task-card__status-label--done { border-color: #dce5d7; background: #f0f4ed; color: #617653; }
+.task-comment__author { display: block; margin-bottom: 6px; color: #514b43; font-size: 12px; font-weight: 650; }
+.profile-name-field { display: grid; gap: 8px; margin-block: 12px; color: #625c54; font-size: 13px; }
+
+.task-card--drag-overlay {
+  width: min(340px, calc(100vw - 48px));
+  border-color: #b8c5b4;
+  background: #fffefa;
+  box-shadow: 0 16px 40px rgb(43 55 43 / 19%);
+  animation: task-card-drag-wiggle 180ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.task-card--drag-overlay .task-card__title { margin: 0 0 10px; }
+@keyframes task-card-drag-wiggle {
+  from { transform: rotate(-0.65deg) scale(1.005); }
+  to { transform: rotate(0.65deg) scale(1.015); }
+}
+
+@media (max-width: 850px) {
+  body { background: #faf9f5; }
+  .kanban-page, .simple-page.projects-page { color: #383b34; }
+  .kanban-column { border-color: #e1e1d8; background: #f3f3ed; }
+  .kanban-column--over { border-color: #a7baa5; background: #ebf0e9; }
+  .task-card { border-color: #e4e2d9; background: #fffefa; }
+  .project-nav { border-color: #e7e5dd; background: #f1f0e9; }
+  .project-management-drawer .ant-drawer-content { background: #fbfaf6; }
+  .projects-header > .ant-btn { flex: 0 0 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-card--drag-overlay { animation: none; }
 }

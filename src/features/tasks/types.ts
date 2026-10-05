@@ -12,6 +12,7 @@ export type Task = {
 export type TaskComment = {
   id: string;
   taskId: string;
+  authorName: string;
   content: string;
   createdAt: string;
 };

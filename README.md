@@ -138,6 +138,7 @@ TanStack Query 管理服务端项目、任务、详情和评论数据；Zustand 
 
 ## 相关文档
 
+- [项目源码阅读攻略：从页面追到 Supabase 与 PostgreSQL](docs/项目源码阅读攻略.md)
 - [项目架构图：服务端学习入口](docs/项目架构图.md)
 - [Supabase 在本项目中的作用与对接说明](docs/Supabase在本项目中的作用与对接说明.md)
 - [用户权限与数据访问](docs/用户权限与数据访问.md)

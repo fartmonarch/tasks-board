@@ -146,11 +146,27 @@ export async function deleteTask(projectId: string, taskId: string): Promise<voi
 export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
   const { data, error } = await requireSupabase()
     .from("comments")
-    .select("id, task_id, content, created_at")
+    .select("id, task_id, author_id, content, created_at")
     .eq("task_id", taskId)
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map((comment) => ({ id: comment.id, taskId: comment.task_id, content: comment.content, createdAt: comment.created_at }));
+  const authorIds = [...new Set((data ?? []).flatMap((comment) => comment.author_id ? [comment.author_id] : []))];
+  const authorNames = new Map<string, string>();
+  if (authorIds.length) {
+    const { data: profiles, error: profilesError } = await requireSupabase()
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", authorIds);
+    if (profilesError) throw profilesError;
+    for (const profile of profiles ?? []) authorNames.set(profile.id, profile.display_name || "未设置姓名");
+  }
+  return (data ?? []).map((comment) => ({
+    id: comment.id,
+    taskId: comment.task_id,
+    authorName: comment.author_id ? authorNames.get(comment.author_id) ?? "未设置姓名" : "已注销用户",
+    content: comment.content,
+    createdAt: comment.created_at,
+  }));
 }
 
 export async function addTaskComment(taskId: string, content: string): Promise<TaskComment> {
@@ -160,8 +176,14 @@ export async function addTaskComment(taskId: string, content: string): Promise<T
   const { data, error } = await requireSupabase()
     .from("comments")
     .insert({ task_id: taskId, author_id: authorId, content: normalizedContent })
-    .select("id, task_id, content, created_at")
+    .select("id, task_id, author_id, content, created_at")
     .single();
   if (error) throw error;
-  return { id: data.id, taskId: data.task_id, content: data.content, createdAt: data.created_at };
+  const { data: profile, error: profileError } = await requireSupabase()
+    .from("profiles")
+    .select("display_name")
+    .eq("id", data.author_id)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  return { id: data.id, taskId: data.task_id, authorName: profile?.display_name || "未设置姓名", content: data.content, createdAt: data.created_at };
 }

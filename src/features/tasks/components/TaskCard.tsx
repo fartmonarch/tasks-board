@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Select, Tooltip } from "antd";
+import { Button, Popconfirm, Tooltip } from "antd";
 import {
   CheckOutlined,
   CommentOutlined,
@@ -14,7 +14,6 @@ import type { Task } from "../types";
 type TaskCardProps = {
   task: Task;
   onComplete: (taskId: string) => void;
-  onStatusChange: (taskId: string, status: Task["status"]) => void;
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onOpenDetails: (taskId: string) => void;
@@ -24,13 +23,13 @@ type TaskCardProps = {
   isDraggable?: boolean;
 };
 
-export function TaskCard({ task, onComplete, onStatusChange, onEdit, onDelete, onOpenDetails, isThisTaskPending, canDelete, readOnly = false, isDraggable = false }: TaskCardProps) {
+export function TaskCard({ task, onComplete, onEdit, onDelete, onOpenDetails, isThisTaskPending, canDelete, readOnly = false, isDraggable = false }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: !isDraggable || isThisTaskPending });
   const priorityLabels = { low: "低", medium: "中", high: "高" };
   return (
     <article
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.35 : undefined }}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.08 : undefined }}
       className={`task-card${isDragging ? " task-card--dragging" : ""}`}
     >
       <div className="task-card__heading">
@@ -60,19 +59,9 @@ export function TaskCard({ task, onComplete, onStatusChange, onEdit, onDelete, o
         </span>
       </div>
       <div className="task-card__footer">
-        <Select
-          className="task-card__status-select"
-          aria-label={`修改${task.title}状态`}
-          size="small"
-          value={task.status}
-          disabled={isThisTaskPending || readOnly}
-          onChange={(value) => onStatusChange(task.id, value)}
-          options={[
-            { label: "待处理", value: "todo" },
-            { label: "进行中", value: "doing" },
-            { label: "已完成", value: "done" },
-          ]}
-        />
+        <span className={`task-card__status-label task-card__status-label--${task.status}`}>
+          {task.status === "todo" ? "待处理" : task.status === "doing" ? "进行中" : "已完成"}
+        </span>
         <div className="task-card__actions" aria-label="任务操作">
           {!readOnly && task.status !== "done" && (
             <Tooltip title="标记为完成">

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Input } from "antd";
+import { Alert, Button, Input, Modal } from "antd";
+import { UserOutlined } from "@ant-design/icons";
 import { Link, Navigate } from "react-router-dom";
 import {
   createProject,
@@ -11,11 +12,33 @@ import {
 import { encodeProjectId } from "../projectIdCodec";
 import { useAuthSession } from "../../auth/AuthSessionContext";
 import { supabase } from "../../../lib/supabase";
+import { getCurrentProfile, updateCurrentProfile } from "../../auth/profileApi";
 export function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
   const session = useAuthSession();
   const userId = session?.user.id;
   const queryClient = useQueryClient();
   const [projectName, setProjectName] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const profileQuery = useQuery({
+    queryKey: ["profile", userId],
+    queryFn: getCurrentProfile,
+    enabled: Boolean(supabase && userId),
+  });
+  useEffect(() => {
+    if (profileQuery.data) setDisplayName(profileQuery.data.displayName);
+  }, [profileQuery.data]);
+  const profileMutation = useMutation({
+    mutationFn: updateCurrentProfile,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profile", userId] }),
+        queryClient.invalidateQueries({ queryKey: ["projectMembers"] }),
+        queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+      ]);
+      setProfileOpen(false);
+    },
+  });
   const adminQuery = useQuery({
     queryKey: ["currentUserIsSystemAdmin", userId],
     queryFn: getCurrentUserIsSystemAdmin,
@@ -83,7 +106,29 @@ export function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
             让每个项目的进度与协作，都有一个清晰的位置。
           </p>
         </div>
+        <Button icon={<UserOutlined />} onClick={() => setProfileOpen(true)}>
+          个人信息
+        </Button>
       </header>
+      {profileQuery.data && !profileQuery.data.displayName.trim() && (
+        <Alert
+          className="project-alert"
+          type="info"
+          showIcon
+          message="添加一个用户名，方便项目成员识别你。"
+          action={<Button size="small" onClick={() => setProfileOpen(true)}>设置用户名</Button>}
+        />
+      )}
+      {profileQuery.isError && (
+        <Alert
+          className="project-alert"
+          type="error"
+          showIcon
+          message="个人信息加载失败"
+          description={profileQuery.error.message}
+          action={<Button size="small" onClick={() => void profileQuery.refetch()}>重试</Button>}
+        />
+      )}
       <nav className="project-nav" aria-label="项目列表范围">
         <Link className={!showAll ? "project-nav__active" : ""} to="/projects">
           我的项目
@@ -223,6 +268,28 @@ export function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
           )}
         </div>
       )}
+      <Modal
+        title="个人信息"
+        open={profileOpen}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={profileMutation.isPending}
+        okButtonProps={{ disabled: !displayName.trim() }}
+        onCancel={() => setProfileOpen(false)}
+        onOk={() => profileMutation.mutate(displayName)}
+      >
+        <label className="profile-name-field">
+          用户名
+          <Input
+            autoFocus
+            maxLength={40}
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            placeholder="项目成员看到的名称"
+          />
+        </label>
+        {profileMutation.isError && <Alert type="error" showIcon message={profileMutation.error.message} />}
+      </Modal>
     </main>
   );
 }
