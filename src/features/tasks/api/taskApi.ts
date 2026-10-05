@@ -17,13 +17,6 @@ function requireSupabase() {
   return supabase;
 }
 
-async function requireUserId() {
-  const { data: { user }, error } = await requireSupabase().auth.getUser();
-  if (error) throw error;
-  if (!user) throw new Error("登录状态已失效，请重新登录。");
-  return user.id;
-}
-
 async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
   await ensureCurrentProfile();
   const assigneeIds = [...new Set(rows.flatMap((row) => row.assignee_user_id ? [row.assignee_user_id] : []))];
@@ -81,12 +74,15 @@ export async function getTaskById(projectId: string, taskId: string): Promise<Ta
   return (await mapTasks([data as TaskRow]))[0];
 }
 
-export async function createTask(projectId: string, title: string): Promise<Task> {
-  const userId = await requireUserId();
+export async function createTask(
+  projectId: string,
+  title: string,
+  createdBy: string,
+): Promise<Task> {
   const sortOrder = await getNextSortOrder(projectId, "todo");
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .insert({ project_id: projectId, title: title.trim(), created_by: userId, sort_order: sortOrder })
+    .insert({ project_id: projectId, title: title.trim(), created_by: createdBy, sort_order: sortOrder })
     .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
     .single();
   if (error) throw error;
@@ -169,8 +165,12 @@ export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
   }));
 }
 
-export async function addTaskComment(taskId: string, content: string): Promise<TaskComment> {
-  const authorId = await requireUserId();
+export async function addTaskComment(
+  taskId: string,
+  content: string,
+  authorId: string,
+  authorName: string,
+): Promise<TaskComment> {
   const normalizedContent = content.trim();
   if (!normalizedContent) throw new Error("评论内容不能为空");
   const { data, error } = await requireSupabase()
@@ -179,11 +179,5 @@ export async function addTaskComment(taskId: string, content: string): Promise<T
     .select("id, task_id, author_id, content, created_at")
     .single();
   if (error) throw error;
-  const { data: profile, error: profileError } = await requireSupabase()
-    .from("profiles")
-    .select("display_name")
-    .eq("id", data.author_id)
-    .maybeSingle();
-  if (profileError) throw profileError;
-  return { id: data.id, taskId: data.task_id, authorName: profile?.display_name || "未设置姓名", content: data.content, createdAt: data.created_at };
+  return { id: data.id, taskId: data.task_id, authorName: authorName || "未设置姓名", content: data.content, createdAt: data.created_at };
 }

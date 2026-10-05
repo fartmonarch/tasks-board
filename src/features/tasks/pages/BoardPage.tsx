@@ -44,15 +44,17 @@ import { supabase } from "../../../lib/supabase";
 import { useTaskUiStore } from "../store/taskUiStore";
 import { filterTasks } from "../utils/filterTasks";
 import type { Task } from "../types";
+import { AUTO_REFRESH_INTERVAL_MS } from "../../../lib/queryConfig";
 export function BoardPage({ projectId }: { projectId: string }) {
   const navigate = useNavigate();
   const session = useAuthSession();
   const userId = session?.user.id;
+  const taskListKey = ["tasks", userId, projectId] as const;
   const projectQuery = useQuery({
     queryKey: ["project", userId, projectId],
     queryFn: () => getProjectById(projectId!),
     enabled: Boolean(supabase && userId && projectId),
-    refetchInterval: 10_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL_MS,
     refetchOnWindowFocus: "always",
   });
   const isArchived = Boolean(projectQuery.data?.archivedAt);
@@ -74,7 +76,7 @@ export function BoardPage({ projectId }: { projectId: string }) {
     queryKey: ["projectRole", userId, projectId],
     queryFn: () => getCurrentProjectRole(projectId!, userId!),
     enabled: Boolean(supabase && userId && projectId),
-    refetchInterval: 10_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL_MS,
     refetchOnWindowFocus: "always",
   });
   const {
@@ -83,17 +85,17 @@ export function BoardPage({ projectId }: { projectId: string }) {
     isError,
     error,
   } = useQuery({
-    queryKey: ["tasks", userId, projectId],
+    queryKey: taskListKey,
     queryFn: () => getTasks(projectId!),
     enabled: Boolean(supabase && userId && projectId),
-    refetchInterval: 10_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL_MS,
     refetchOnWindowFocus: "always",
   });
   const membersQuery = useQuery({
     queryKey: ["projectMembers", userId, projectId],
     queryFn: () => getProjectMembers(projectId!),
     enabled: Boolean(supabase && userId && projectId),
-    refetchInterval: 10_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL_MS,
     refetchOnWindowFocus: "always",
   });
   const queryClient = useQueryClient();
@@ -135,11 +137,11 @@ export function BoardPage({ projectId }: { projectId: string }) {
     }
   };
   const createMutation = useMutation({
-    mutationFn: (title: string) => createTask(projectId!, title),
-    onSuccess: async () => {
+    mutationFn: (title: string) => createTask(projectId!, title, userId!),
+    onSuccess: (createdTask) => {
       setNewTaskTitle("");
       setActionError("");
-      await refreshTasks();
+      queryClient.setQueryData<Task[]>(taskListKey, (current = []) => [...current, createdTask]);
     },
     onError: (e) => setActionError(e.message),
   });
@@ -153,47 +155,54 @@ export function BoardPage({ projectId }: { projectId: string }) {
         Pick<Task, "title" | "status" | "priority" | "assigneeUserId">
       >;
     }) => updateTask(projectId!, id, changes),
-    onSuccess: async () => {
+    onSuccess: (updatedTask) => {
       setEditingTask(null);
       setActionError("");
-      await refreshTasks();
+      queryClient.setQueryData<Task[]>(taskListKey, (current = []) =>
+        current.map((task) => task.id === updatedTask.id ? updatedTask : task),
+      );
+      queryClient.setQueryData(
+        ["tasks", "detail", userId, projectId, updatedTask.id],
+        updatedTask,
+      );
     },
     onError: (e) => setActionError(e.message),
   });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteTask(projectId!, id),
-    onSuccess: async () => {
+    onSuccess: (_result, deletedTaskId) => {
       setActionError("");
       setActionNotice("任务已删除。");
-      if (selectedTaskId === deleteMutation.variables) closeTask();
-      await refreshTasks();
+      if (selectedTaskId === deletedTaskId) closeTask();
+      queryClient.setQueryData<Task[]>(taskListKey, (current = []) =>
+        current.filter((task) => task.id !== deletedTaskId),
+      );
     },
     onError: async (e) => {
       setActionNotice("");
       setActionError(e.message);
-      await refreshTasks();
+      await queryClient.invalidateQueries({ queryKey: taskListKey, exact: true });
     },
   });
   const reorderMutation = useMutation({
     mutationFn: (ordered: Task[]) => persistTaskOrder(projectId!, ordered),
     onMutate: async (ordered) => {
-      const key = ["tasks", userId, projectId];
+      const key = taskListKey;
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<Task[]>(key);
       queryClient.setQueryData(key, ordered);
       return { previous };
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       setActionError("");
       setActionNotice("任务排序已保存。其他协作者稍后会自动看到更新。");
-      await refreshTasks();
     },
     onError: async (e, _ordered, context) => {
-      const key = ["tasks", userId, projectId];
+      const key = taskListKey;
       if (context?.previous) queryClient.setQueryData(key, context.previous);
       setActionNotice("");
       setActionError(e.message);
-      await refreshTasks();
+      await queryClient.invalidateQueries({ queryKey: taskListKey, exact: true });
     },
   });
 

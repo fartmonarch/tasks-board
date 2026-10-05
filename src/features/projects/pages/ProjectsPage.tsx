@@ -30,12 +30,8 @@ export function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
   }, [profileQuery.data]);
   const profileMutation = useMutation({
     mutationFn: updateCurrentProfile,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["profile", userId] }),
-        queryClient.invalidateQueries({ queryKey: ["projectMembers"] }),
-        queryClient.invalidateQueries({ queryKey: ["tasks"] }),
-      ]);
+    onSuccess: (profile) => {
+      queryClient.setQueryData(["profile", userId], profile);
       setProfileOpen(false);
     },
   });
@@ -46,7 +42,7 @@ export function ProjectsPage({ showAll = false }: { showAll?: boolean }) {
   });
   const workspaceQuery = useQuery({
     queryKey: ["workspace", "projects", userId],
-    queryFn: getWorkspace,
+    queryFn: () => getWorkspace(userId!),
     enabled: Boolean(supabase && userId && !showAll),
   });
   const allProjectsQuery = useQuery({

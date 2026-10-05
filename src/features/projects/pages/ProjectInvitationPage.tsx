@@ -30,12 +30,8 @@ export function ProjectInvitationPage() {
   }, [profileQuery.data]);
   const profileMutation = useMutation({
     mutationFn: updateCurrentProfile,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["profile", session?.user.id] }),
-        queryClient.invalidateQueries({ queryKey: ["projectMembers"] }),
-        queryClient.invalidateQueries({ queryKey: ["tasks"] }),
-      ]);
+    onSuccess: (profile) => {
+      queryClient.setQueryData(["profile", session?.user.id], profile);
       setProfileOpen(false);
     },
   });

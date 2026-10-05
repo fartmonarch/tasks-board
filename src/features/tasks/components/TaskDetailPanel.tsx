@@ -3,6 +3,9 @@ import { Alert, Button, Drawer, Input, Spin } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addTaskComment, getTaskById, getTaskComments } from "../api/taskApi";
 import { useTaskUiStore } from "../store/taskUiStore";
+import { getCachedCurrentProfileName } from "../../auth/profileApi";
+import { AUTO_REFRESH_INTERVAL_MS } from "../../../lib/queryConfig";
+import type { TaskComment } from "../types";
 
 type AddCommentVariables = {
   taskId: string;
@@ -25,7 +28,7 @@ export function TaskDetailPanel({ projectId, userId, readOnly = false }: { proje
       return task;
     },
     enabled: selectedTaskId !== null,
-    refetchInterval: 10_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL_MS,
     refetchOnWindowFocus: "always",
   });
 
@@ -36,18 +39,24 @@ export function TaskDetailPanel({ projectId, userId, readOnly = false }: { proje
         ? Promise.resolve([])
         : getTaskComments(selectedTaskId),
     enabled: selectedTaskId !== null,
-    refetchInterval: 10_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL_MS,
     refetchOnWindowFocus: "always",
   });
 
   const addCommentMutation = useMutation({
     mutationFn: ({ taskId, content }: AddCommentVariables) =>
-      addTaskComment(taskId, content),
-    onSuccess: (_comment, variables) => {
+      addTaskComment(
+        taskId,
+        content,
+        userId,
+        getCachedCurrentProfileName(userId) ?? "未设置姓名",
+      ),
+    onSuccess: (comment, variables) => {
       setCommentContent("");
-      return queryClient.invalidateQueries({
-        queryKey: ["tasks", "comments", userId, projectId, variables.taskId],
-      });
+      queryClient.setQueryData(
+        ["tasks", "comments", userId, projectId, variables.taskId],
+        (current: TaskComment[] = []) => [...current, comment],
+      );
     },
   });
 

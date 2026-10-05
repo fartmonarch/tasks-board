@@ -34,12 +34,22 @@ export function ProjectManagement({
   const clearFeedback = () => { setNotice(""); setActionError(""); };
   const refresh = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["project"] }),
-      queryClient.invalidateQueries({ queryKey: ["projectMembers"] }),
-      queryClient.invalidateQueries({ queryKey: ["projectRole"] }),
-      queryClient.invalidateQueries({ queryKey: ["projectInvitePermission"] }),
+      queryClient.invalidateQueries({
+        queryKey: ["project", currentUserId, project.id], exact: true,
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["projectMembers", currentUserId, project.id], exact: true,
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["projectRole", currentUserId, project.id], exact: true,
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["projectInvitePermission", currentUserId, project.id], exact: true,
+      }),
       queryClient.invalidateQueries({ queryKey: ["workspace"] }),
-      queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", currentUserId, project.id], exact: true,
+      }),
     ]);
   };
   const removeMutation = useMutation({

@@ -24,16 +24,12 @@ function requireSupabase() {
   return supabase;
 }
 
-export async function getWorkspace() {
+export async function getWorkspace(userId: string) {
   const client = requireSupabase();
-  const { data: { user }, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  if (!user) throw new Error("登录状态已失效，请重新登录。");
-
   const membershipsResult = await client
     .from("project_members")
     .select("project_id, role")
-    .eq("user_id", user.id);
+    .eq("user_id", userId);
   if (membershipsResult.error) throw membershipsResult.error;
   const projectIds = (membershipsResult.data ?? []).map((membership) => membership.project_id);
   if (projectIds.length === 0) return { projects: [] as MyProject[] };
