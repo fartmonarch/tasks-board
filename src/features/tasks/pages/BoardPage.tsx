@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
@@ -185,14 +185,9 @@ export function BoardPage({ projectId }: { projectId: string }) {
     },
   });
   const reorderMutation = useMutation({
-    mutationFn: (ordered: Task[]) => persistTaskOrder(projectId!, ordered),
-    onMutate: async (ordered) => {
-      const key = taskListKey;
-      await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<Task[]>(key);
-      queryClient.setQueryData(key, ordered);
-      return { previous };
-    },
+    mutationFn: ({ ordered }: { ordered: Task[]; previous?: Task[] }) =>
+      persistTaskOrder(projectId!, ordered),
+    onMutate: ({ previous }) => ({ previous }),
     onSuccess: () => {
       setActionError("");
       setActionNotice("任务排序已保存。其他协作者稍后会自动看到更新。");
@@ -205,6 +200,14 @@ export function BoardPage({ projectId }: { projectId: string }) {
       await queryClient.invalidateQueries({ queryKey: taskListKey, exact: true });
     },
   });
+  const completeTask = useCallback(
+    (id: string) => updateMutation.mutate({ id, changes: { status: "done" } }),
+    [updateMutation.mutate],
+  );
+  const removeTask = useCallback(
+    (id: string) => deleteMutation.mutate(id),
+    [deleteMutation.mutate],
+  );
 
   if (!supabase)
     return (
@@ -319,8 +322,7 @@ export function BoardPage({ projectId }: { projectId: string }) {
       if (adjustedIndex < 0 || adjustedIndex === sourceIndex) return;
       const reordered = arrayMove(sourceList, sourceIndex, adjustedIndex);
       const next = statuses.flatMap((status) =>
-        (status === destination ? reordered : current.filter((task) => task.status === status))
-          .map((task, sortOrder) => ({ ...task, sortOrder })),
+        status === destination ? reordered : current.filter((task) => task.status === status),
       );
       dragPreviewRef.current = next;
       setDragPreviewTasks(next);
@@ -337,14 +339,13 @@ export function BoardPage({ projectId }: { projectId: string }) {
       movedTask,
       ...destinationList.slice(targetIndex),
     ];
-    const next = statuses.flatMap((status) => {
-      const statusTasks = status === draggedTask.status
+    const next = statuses.flatMap((status) =>
+      status === draggedTask.status
         ? sourceList.filter((task) => task.id !== draggedTask.id)
         : status === destination
           ? nextDestination
-          : current.filter((task) => task.status === status);
-      return statusTasks.map((task, sortOrder) => ({ ...task, sortOrder }));
-    });
+          : current.filter((task) => task.status === status),
+    );
     dragPreviewRef.current = next;
     setDragPreviewTasks(next);
   };
@@ -352,12 +353,28 @@ export function BoardPage({ projectId }: { projectId: string }) {
     setActiveDragTaskId(null);
     const next = dragPreviewRef.current;
     dragPreviewRef.current = null;
-    setDragPreviewTasks(null);
-    if (!over || !canReorder || reorderMutation.isPending || !next) return;
+    if (!over || !canReorder || reorderMutation.isPending || !next) {
+      setDragPreviewTasks(null);
+      return;
+    }
     const changed = next.some((task, index) =>
       task.id !== orderedTasks[index]?.id || task.status !== orderedTasks[index]?.status,
     );
-    if (changed) reorderMutation.mutate(next);
+    if (changed) {
+      const previous = queryClient.getQueryData<Task[]>(taskListKey);
+      const nextSortOrders = new Map<Task["status"], number>();
+      const orderedForCache = next.map((task) => {
+        const sortOrder = nextSortOrders.get(task.status) ?? 0;
+        nextSortOrders.set(task.status, sortOrder + 1);
+        return task.sortOrder === sortOrder ? task : { ...task, sortOrder };
+      });
+      void queryClient.cancelQueries({ queryKey: taskListKey, exact: true });
+      queryClient.setQueryData(taskListKey, orderedForCache);
+      setDragPreviewTasks(null);
+      reorderMutation.mutate({ ordered: orderedForCache, previous });
+    } else {
+      setDragPreviewTasks(null);
+    }
   };
   const handleDragCancel = () => {
     setActiveDragTaskId(null);
@@ -366,7 +383,7 @@ export function BoardPage({ projectId }: { projectId: string }) {
   };
 
   return (
-    <main className="kanban-page">
+    <main className={`kanban-page${activeDragTaskId ? " kanban-page--dragging" : ""}`}>
       <header className="kanban-header">
         <div className="kanban-heading">
           <p className="eyebrow">
@@ -547,11 +564,9 @@ export function BoardPage({ projectId }: { projectId: string }) {
                   <TaskCard
                     key={task.id}
                     task={task}
-                    onComplete={(id) =>
-                      updateMutation.mutate({ id, changes: { status: "done" } })
-                    }
+                    onComplete={completeTask}
                     onEdit={setEditingTask}
-                    onDelete={(id) => deleteMutation.mutate(id)}
+                    onDelete={removeTask}
                     canDelete={canDeleteTask(task)}
                     readOnly={isArchived}
                     isDraggable={canReorder && !reorderMutation.isPending}

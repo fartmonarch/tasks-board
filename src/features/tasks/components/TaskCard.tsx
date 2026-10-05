@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Button, Popconfirm, Tooltip } from "antd";
 import {
   CheckOutlined,
@@ -23,7 +24,7 @@ type TaskCardProps = {
   isDraggable?: boolean;
 };
 
-export function TaskCard({ task, onComplete, onEdit, onDelete, onOpenDetails, isThisTaskPending, canDelete, readOnly = false, isDraggable = false }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, onComplete, onEdit, onDelete, onOpenDetails, isThisTaskPending, canDelete, readOnly = false, isDraggable = false }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, disabled: !isDraggable || isThisTaskPending });
   const priorityLabels = { low: "低", medium: "中", high: "高" };
   return (
@@ -124,4 +125,4 @@ export function TaskCard({ task, onComplete, onEdit, onDelete, onOpenDetails, is
       </div>
     </article>
   );
-}
+});

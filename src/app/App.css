@@ -1209,13 +1209,19 @@ body {
   border-color: #b8c5b4;
   background: #fffefa;
   box-shadow: 0 16px 40px rgb(43 55 43 / 19%);
-  animation: task-card-drag-wiggle 180ms ease-in-out infinite alternate;
+  animation: task-card-drag-wiggle 320ms ease-in-out infinite alternate;
+  will-change: transform;
   pointer-events: none;
 }
 .task-card--drag-overlay .task-card__title { margin: 0 0 10px; }
 @keyframes task-card-drag-wiggle {
-  from { transform: rotate(-0.65deg) scale(1.005); }
-  to { transform: rotate(0.65deg) scale(1.015); }
+  from { transform: rotate(-0.35deg) scale(1.004); }
+  to { transform: rotate(0.35deg) scale(1.008); }
+}
+
+.kanban-page--dragging .task-card:hover {
+  transform: none;
+  box-shadow: 0 2px 5px rgb(40 53 44 / 4%);
 }
 
 @media (max-width: 850px) {
