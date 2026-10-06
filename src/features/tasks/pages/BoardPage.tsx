@@ -10,7 +10,11 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import type { DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
+import type {
+  DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
+} from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Alert, Button, Drawer, Input, Modal, Select, Tooltip } from "antd";
 import {
@@ -45,6 +49,7 @@ import { useTaskUiStore } from "../store/taskUiStore";
 import { filterTasks } from "../utils/filterTasks";
 import type { Task } from "../types";
 import { AUTO_REFRESH_INTERVAL_MS } from "../../../lib/queryConfig";
+
 export function BoardPage({ projectId }: { projectId: string }) {
   const navigate = useNavigate();
   const session = useAuthSession();
@@ -141,7 +146,10 @@ export function BoardPage({ projectId }: { projectId: string }) {
     onSuccess: (createdTask) => {
       setNewTaskTitle("");
       setActionError("");
-      queryClient.setQueryData<Task[]>(taskListKey, (current = []) => [...current, createdTask]);
+      queryClient.setQueryData<Task[]>(taskListKey, (current = []) => [
+        ...current,
+        createdTask,
+      ]);
     },
     onError: (e) => setActionError(e.message),
   });
@@ -159,7 +167,9 @@ export function BoardPage({ projectId }: { projectId: string }) {
       setEditingTask(null);
       setActionError("");
       queryClient.setQueryData<Task[]>(taskListKey, (current = []) =>
-        current.map((task) => task.id === updatedTask.id ? updatedTask : task),
+        current.map((task) =>
+          task.id === updatedTask.id ? updatedTask : task,
+        ),
       );
       queryClient.setQueryData(
         ["tasks", "detail", userId, projectId, updatedTask.id],
@@ -181,7 +191,10 @@ export function BoardPage({ projectId }: { projectId: string }) {
     onError: async (e) => {
       setActionNotice("");
       setActionError(e.message);
-      await queryClient.invalidateQueries({ queryKey: taskListKey, exact: true });
+      await queryClient.invalidateQueries({
+        queryKey: taskListKey,
+        exact: true,
+      });
     },
   });
   const reorderMutation = useMutation({
@@ -197,7 +210,10 @@ export function BoardPage({ projectId }: { projectId: string }) {
       if (context?.previous) queryClient.setQueryData(key, context.previous);
       setActionNotice("");
       setActionError(e.message);
-      await queryClient.invalidateQueries({ queryKey: taskListKey, exact: true });
+      await queryClient.invalidateQueries({
+        queryKey: taskListKey,
+        exact: true,
+      });
     },
   });
   const completeTask = useCallback(
@@ -301,13 +317,19 @@ export function BoardPage({ projectId }: { projectId: string }) {
     const statuses: Task["status"][] = ["todo", "doing", "done"];
     const draggedTask = current.find((task) => task.id === active.id);
     const overTask = current.find((task) => task.id === over.id);
-    const destination = overTask?.status ?? (statuses.includes(over.id as Task["status"])
-      ? (over.id as Task["status"])
-      : undefined);
+    const destination =
+      overTask?.status ??
+      (statuses.includes(over.id as Task["status"])
+        ? (over.id as Task["status"])
+        : undefined);
     if (!draggedTask || !destination) return;
 
-    const sourceList = current.filter((task) => task.status === draggedTask.status);
-    const sourceIndex = sourceList.findIndex((task) => task.id === draggedTask.id);
+    const sourceList = current.filter(
+      (task) => task.status === draggedTask.status,
+    );
+    const sourceIndex = sourceList.findIndex(
+      (task) => task.id === draggedTask.id,
+    );
     const translatedRect = active.rect.current.translated;
     const activeCenter = translatedRect
       ? translatedRect.top + translatedRect.height / 2
@@ -316,22 +338,29 @@ export function BoardPage({ projectId }: { projectId: string }) {
 
     if (draggedTask.status === destination) {
       const targetIndex = overTask
-        ? sourceList.findIndex((task) => task.id === overTask.id) + (insertAfter ? 1 : 0)
+        ? sourceList.findIndex((task) => task.id === overTask.id) +
+          (insertAfter ? 1 : 0)
         : sourceList.length;
-      const adjustedIndex = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex;
+      const adjustedIndex =
+        targetIndex > sourceIndex ? targetIndex - 1 : targetIndex;
       if (adjustedIndex < 0 || adjustedIndex === sourceIndex) return;
       const reordered = arrayMove(sourceList, sourceIndex, adjustedIndex);
       const next = statuses.flatMap((status) =>
-        status === destination ? reordered : current.filter((task) => task.status === status),
+        status === destination
+          ? reordered
+          : current.filter((task) => task.status === status),
       );
       dragPreviewRef.current = next;
       setDragPreviewTasks(next);
       return;
     }
 
-    const destinationList = current.filter((task) => task.status === destination);
+    const destinationList = current.filter(
+      (task) => task.status === destination,
+    );
     const targetIndex = overTask
-      ? destinationList.findIndex((task) => task.id === overTask.id) + (insertAfter ? 1 : 0)
+      ? destinationList.findIndex((task) => task.id === overTask.id) +
+        (insertAfter ? 1 : 0)
       : destinationList.length;
     const movedTask = { ...draggedTask, status: destination };
     const nextDestination = [
@@ -357,8 +386,10 @@ export function BoardPage({ projectId }: { projectId: string }) {
       setDragPreviewTasks(null);
       return;
     }
-    const changed = next.some((task, index) =>
-      task.id !== orderedTasks[index]?.id || task.status !== orderedTasks[index]?.status,
+    const changed = next.some(
+      (task, index) =>
+        task.id !== orderedTasks[index]?.id ||
+        task.status !== orderedTasks[index]?.status,
     );
     if (changed) {
       const previous = queryClient.getQueryData<Task[]>(taskListKey);
@@ -383,7 +414,9 @@ export function BoardPage({ projectId }: { projectId: string }) {
   };
 
   return (
-    <main className={`kanban-page${activeDragTaskId ? " kanban-page--dragging" : ""}`}>
+    <main
+      className={`kanban-page${activeDragTaskId ? " kanban-page--dragging" : ""}`}
+    >
       <header className="kanban-header">
         <div className="kanban-heading">
           <p className="eyebrow">
@@ -578,21 +611,32 @@ export function BoardPage({ projectId }: { projectId: string }) {
             ))}
           </section>
           <DragOverlay>
-            {activeDragTaskId && (() => {
-              const task = orderedTasks.find((item) => item.id === activeDragTaskId);
-              if (!task) return null;
-              return (
-                <article className="task-card task-card--drag-overlay" aria-hidden="true">
-                  <h3 className="task-card__title">{task.title}</h3>
-                  <div className="task-card__meta">
-                    <span className={`task-card__priority task-card__priority--${task.priority}`}>
-                      {{ low: "低", medium: "中", high: "高" }[task.priority]}优先级
-                    </span>
-                    <span className="task-card__assignee">{task.assignee || "未分配"}</span>
-                  </div>
-                </article>
-              );
-            })()}
+            {activeDragTaskId &&
+              (() => {
+                const task = orderedTasks.find(
+                  (item) => item.id === activeDragTaskId,
+                );
+                if (!task) return null;
+                return (
+                  <article
+                    className="task-card task-card--drag-overlay"
+                    aria-hidden="true"
+                  >
+                    <h3 className="task-card__title">{task.title}</h3>
+                    <div className="task-card__meta">
+                      <span
+                        className={`task-card__priority task-card__priority--${task.priority}`}
+                      >
+                        {{ low: "低", medium: "中", high: "高" }[task.priority]}
+                        优先级
+                      </span>
+                      <span className="task-card__assignee">
+                        {task.assignee || "未分配"}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })()}
           </DragOverlay>
         </DndContext>
       )}
@@ -671,7 +715,9 @@ export function BoardPage({ projectId }: { projectId: string }) {
               状态
               <Select
                 value={editingTask.status}
-                onChange={(status) => setEditingTask({ ...editingTask, status })}
+                onChange={(status) =>
+                  setEditingTask({ ...editingTask, status })
+                }
                 options={[
                   { label: "待处理", value: "todo" },
                   { label: "进行中", value: "doing" },
@@ -717,4 +763,3 @@ export function BoardPage({ projectId }: { projectId: string }) {
     </main>
   );
 }
-

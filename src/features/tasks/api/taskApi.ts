@@ -19,12 +19,22 @@ function requireSupabase() {
 
 async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
   await ensureCurrentProfile();
-  const assigneeIds = [...new Set(rows.flatMap((row) => row.assignee_user_id ? [row.assignee_user_id] : []))];
+  const assigneeIds = [
+    ...new Set(
+      rows.flatMap((row) =>
+        row.assignee_user_id ? [row.assignee_user_id] : [],
+      ),
+    ),
+  ];
   const profiles = new Map<string, string>();
   if (assigneeIds.length > 0) {
-    const { data, error } = await requireSupabase().from("profiles").select("id, display_name").in("id", assigneeIds);
+    const { data, error } = await requireSupabase()
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", assigneeIds);
     if (error) throw error;
-    for (const profile of data ?? []) profiles.set(profile.id, profile.display_name || "未设置姓名");
+    for (const profile of data ?? [])
+      profiles.set(profile.id, profile.display_name || "未设置姓名");
   }
   return rows.map((row) => ({
     id: row.id,
@@ -33,12 +43,17 @@ async function mapTasks(rows: TaskRow[]): Promise<Task[]> {
     priority: row.priority,
     assigneeUserId: row.assignee_user_id,
     createdBy: row.created_by,
-    assignee: row.assignee_user_id ? profiles.get(row.assignee_user_id) ?? "未设置姓名" : "未分配",
+    assignee: row.assignee_user_id
+      ? (profiles.get(row.assignee_user_id) ?? "未设置姓名")
+      : "未分配",
     sortOrder: row.sort_order,
   }));
 }
 
-async function getNextSortOrder(projectId: string, status: Task["status"]): Promise<number> {
+async function getNextSortOrder(
+  projectId: string,
+  status: Task["status"],
+): Promise<number> {
   const { data, error } = await requireSupabase()
     .from("tasks")
     .select("sort_order")
@@ -54,7 +69,9 @@ async function getNextSortOrder(projectId: string, status: Task["status"]): Prom
 export async function getTasks(projectId: string): Promise<Task[]> {
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
+    .select(
+      "id, title, status, priority, assignee_user_id, created_by, sort_order",
+    )
     .eq("project_id", projectId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
@@ -62,10 +79,15 @@ export async function getTasks(projectId: string): Promise<Task[]> {
   return mapTasks((data ?? []) as TaskRow[]);
 }
 
-export async function getTaskById(projectId: string, taskId: string): Promise<Task | undefined> {
+export async function getTaskById(
+  projectId: string,
+  taskId: string,
+): Promise<Task | undefined> {
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
+    .select(
+      "id, title, status, priority, assignee_user_id, created_by, sort_order",
+    )
     .eq("project_id", projectId)
     .eq("id", taskId)
     .maybeSingle();
@@ -82,8 +104,15 @@ export async function createTask(
   const sortOrder = await getNextSortOrder(projectId, "todo");
   const { data, error } = await requireSupabase()
     .from("tasks")
-    .insert({ project_id: projectId, title: title.trim(), created_by: createdBy, sort_order: sortOrder })
-    .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
+    .insert({
+      project_id: projectId,
+      title: title.trim(),
+      created_by: createdBy,
+      sort_order: sortOrder,
+    })
+    .select(
+      "id, title, status, priority, assignee_user_id, created_by, sort_order",
+    )
     .single();
   if (error) throw error;
   return (await mapTasks([data as TaskRow]))[0];
@@ -92,23 +121,30 @@ export async function createTask(
 export async function updateTask(
   projectId: string,
   taskId: string,
-  changes: Partial<Pick<Task, "title" | "status" | "priority" | "assigneeUserId">>,
+  changes: Partial<
+    Pick<Task, "title" | "status" | "priority" | "assigneeUserId">
+  >,
 ): Promise<Task> {
-  const sortOrder = changes.status === undefined
-    ? undefined
-    : await getNextSortOrder(projectId, changes.status);
+  const sortOrder =
+    changes.status === undefined
+      ? undefined
+      : await getNextSortOrder(projectId, changes.status);
   const { data, error } = await requireSupabase()
     .from("tasks")
     .update({
       ...(changes.title === undefined ? {} : { title: changes.title.trim() }),
       ...(changes.status === undefined ? {} : { status: changes.status }),
       ...(changes.priority === undefined ? {} : { priority: changes.priority }),
-      ...(changes.assigneeUserId === undefined ? {} : { assignee_user_id: changes.assigneeUserId }),
+      ...(changes.assigneeUserId === undefined
+        ? {}
+        : { assignee_user_id: changes.assigneeUserId }),
       ...(sortOrder === undefined ? {} : { sort_order: sortOrder }),
     })
     .eq("project_id", projectId)
     .eq("id", taskId)
-    .select("id, title, status, priority, assignee_user_id, created_by, sort_order")
+    .select(
+      "id, title, status, priority, assignee_user_id, created_by, sort_order",
+    )
     .single();
   if (error) throw error;
   return (await mapTasks([data as TaskRow]))[0];
@@ -126,7 +162,10 @@ export async function persistTaskOrder(
   if (error) throw error;
 }
 
-export async function deleteTask(projectId: string, taskId: string): Promise<void> {
+export async function deleteTask(
+  projectId: string,
+  taskId: string,
+): Promise<void> {
   const { data, error } = await requireSupabase()
     .from("tasks")
     .delete()
@@ -135,7 +174,9 @@ export async function deleteTask(projectId: string, taskId: string): Promise<voi
     .select("id");
   if (error) throw error;
   if (data?.length !== 1) {
-    throw new Error("任务未删除，可能已被其他成员删除或当前账号没有权限。请刷新后重试。");
+    throw new Error(
+      "任务未删除，可能已被其他成员删除或当前账号没有权限。请刷新后重试。",
+    );
   }
 }
 
@@ -146,7 +187,13 @@ export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
     .eq("task_id", taskId)
     .order("created_at", { ascending: true });
   if (error) throw error;
-  const authorIds = [...new Set((data ?? []).flatMap((comment) => comment.author_id ? [comment.author_id] : []))];
+  const authorIds = [
+    ...new Set(
+      (data ?? []).flatMap((comment) =>
+        comment.author_id ? [comment.author_id] : [],
+      ),
+    ),
+  ];
   const authorNames = new Map<string, string>();
   if (authorIds.length) {
     const { data: profiles, error: profilesError } = await requireSupabase()
@@ -154,12 +201,15 @@ export async function getTaskComments(taskId: string): Promise<TaskComment[]> {
       .select("id, display_name")
       .in("id", authorIds);
     if (profilesError) throw profilesError;
-    for (const profile of profiles ?? []) authorNames.set(profile.id, profile.display_name || "未设置姓名");
+    for (const profile of profiles ?? [])
+      authorNames.set(profile.id, profile.display_name || "未设置姓名");
   }
   return (data ?? []).map((comment) => ({
     id: comment.id,
     taskId: comment.task_id,
-    authorName: comment.author_id ? authorNames.get(comment.author_id) ?? "未设置姓名" : "已注销用户",
+    authorName: comment.author_id
+      ? (authorNames.get(comment.author_id) ?? "未设置姓名")
+      : "已注销用户",
     content: comment.content,
     createdAt: comment.created_at,
   }));
@@ -175,9 +225,19 @@ export async function addTaskComment(
   if (!normalizedContent) throw new Error("评论内容不能为空");
   const { data, error } = await requireSupabase()
     .from("comments")
-    .insert({ task_id: taskId, author_id: authorId, content: normalizedContent })
+    .insert({
+      task_id: taskId,
+      author_id: authorId,
+      content: normalizedContent,
+    })
     .select("id, task_id, author_id, content, created_at")
     .single();
   if (error) throw error;
-  return { id: data.id, taskId: data.task_id, authorName: authorName || "未设置姓名", content: data.content, createdAt: data.created_at };
+  return {
+    id: data.id,
+    taskId: data.task_id,
+    authorName: authorName || "未设置姓名",
+    content: data.content,
+    createdAt: data.created_at,
+  };
 }
